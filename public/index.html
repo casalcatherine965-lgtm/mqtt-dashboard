@@ -223,12 +223,12 @@
       tempGauge.refresh(temp);
       humGauge.refresh(hum);
 
-      const time = new Date().toLocaleTimeString();
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       labels.push(time);
       tempData.push(temp);
       humData.push(hum);
 
-      if(labels.length > 20){
+      if(labels.length > 7){
         labels.shift();
         tempData.shift();
         humData.shift();
