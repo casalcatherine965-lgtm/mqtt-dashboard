@@ -5,9 +5,17 @@
   <title>DHT22 Live Dashboard</title>
   <script src="https://unpkg.com/paho-mqtt/mqttws31.js"></script>
   <style>
-    body { font-family: Arial; text-align:center; padding:50px; background:#f0f4f8; }
-    h1 { color:#333; }
-    .reading { font-size:2em; margin:20px 0; padding:20px; background:#fff; border-radius:10px; display:inline-block; min-width:200px; }
+    body { font-family: Arial; text-align: center; padding: 50px; background: #f0f4f8; }
+    h1 { color: #333; }
+    .reading {
+      font-size: 2em;
+      margin: 20px 0;
+      padding: 20px;
+      background: #fff;
+      border-radius: 10px;
+      display: inline-block;
+      min-width: 200px;
+    }
   </style>
 </head>
 <body>
@@ -20,20 +28,25 @@
   </div>
 
   <script>
+    // HiveMQ public broker settings
     const broker = "broker.hivemq.com";
-    const port = 8000; // public WebSocket port
-    const topic = "esp32/dht22";
+    const port = 8000; // WebSocket port (public)
+    const topic = "esp32/dht22";  // ESP32 publishes here
 
+    // Create MQTT client
     const client = new Paho.MQTT.Client(broker, port, "webclient_" + Math.random());
 
+    // Callback for connection loss
     client.onConnectionLost = function(responseObject) {
       console.log("Connection lost:", responseObject.errorMessage);
-      setTimeout(connectMQTT, 3000);
+      setTimeout(connectMQTT, 3000); // Reconnect after 3 seconds
     };
 
+    // Callback for incoming messages
     client.onMessageArrived = function(message) {
       try {
         const data = JSON.parse(message.payloadString);
+        // Update the dashboard with data
         document.getElementById("temperature").innerText = data.temp;
         document.getElementById("humidity").innerText = data.hum;
       } catch (e) {
@@ -41,20 +54,21 @@
       }
     };
 
+    // Function to connect to MQTT broker
     function connectMQTT() {
       client.connect({
         onSuccess: function() {
           console.log("Connected to HiveMQ public broker");
-          client.subscribe(topic);
+          client.subscribe(topic);  // Subscribe to the ESP32 topic
         },
         onFailure: function(err) {
           console.error("Connection failed:", err);
-          setTimeout(connectMQTT, 5000);
+          setTimeout(connectMQTT, 5000); // Retry every 5 seconds if connection fails
         }
       });
     }
 
-    connectMQTT();
+    connectMQTT();  // Initial connection attempt
   </script>
 </body>
 </html>
