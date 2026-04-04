@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>DHT22 IoT Dashboard</title>
+  <title>AWD Multi-Node Dashboard</title>
 
-  <!-- MQTT -->
+  <!-- MQTT.js -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <!-- Chart.js -->
@@ -19,154 +19,167 @@
       text-align: center;
     }
 
-    h1 {
-      margin-bottom: 10px;
-    }
+    h1 { margin-bottom: 15px; }
 
-    .status {
-      margin-bottom: 20px;
-      font-weight: bold;
-    }
+    .status { margin-bottom: 20px; font-weight: bold; }
 
-    .container {
-      display: flex;
-      justify-content: center;
+    .nodes {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
       gap: 20px;
-      flex-wrap: wrap;
+      justify-items: center;
     }
 
-    .card {
+    .node-card {
       background: white;
-      padding: 20px;
+      padding: 15px;
       border-radius: 12px;
-      width: 220px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      width: 300px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
     }
 
-    .value {
-      font-size: 2em;
-      margin-top: 10px;
-    }
+    .node-title { font-weight: bold; margin-bottom: 10px; font-size: 1.2em; }
+
+    .value-label { margin-top: 5px; font-weight: bold; font-size: 0.9em; color: #555; }
+
+    .value { font-size: 1.5em; margin-bottom: 5px; }
+
+    .charts { display: flex; justify-content: space-around; flex-wrap: wrap; margin-top: 10px; gap: 5px; }
 
     canvas {
-      margin-top: 30px;
-      background: white;
-      border-radius: 12px;
-      padding: 10px;
-      max-width: 800px;
+      width: 90px !important;
+      height: 80px !important;
+      border-radius: 6px;
+      background: #fafafa;
     }
   </style>
 </head>
-
 <body>
 
-  <h1>🌡️ DHT22 IoT Monitoring Dashboard</h1>
-  <div class="status">Status: <span id="status">Connecting...</span></div>
+<h1>🌾 AWD Multi-Node Dashboard</h1>
+<div class="status">Status: <span id="status">Connecting...</span></div>
 
-  <div class="container">
-    <div class="card">
-      Temperature
-      <div class="value" id="temperature">-- °C</div>
-    </div>
-
-    <div class="card">
-      Humidity
-      <div class="value" id="humidity">-- %</div>
+<div class="nodes">
+  <!-- Node 1 (active) -->
+  <div class="node-card" id="node1">
+    <div class="node-title">Node 1</div>
+    <div class="value" id="node1-water">-- cm</div>
+    <div class="value-label">Water Level</div>
+    <div class="value" id="node1-temp">-- °C</div>
+    <div class="value-label">Temperature</div>
+    <div class="value" id="node1-hum">-- %</div>
+    <div class="value-label">Humidity</div>
+    <div class="charts">
+      <canvas id="node1-water-chart"></canvas>
+      <canvas id="node1-temp-chart"></canvas>
+      <canvas id="node1-hum-chart"></canvas>
     </div>
   </div>
 
-  <!-- Charts -->
-  <canvas id="tempChart"></canvas>
-  <canvas id="humChart"></canvas>
+  <!-- Node 2 (placeholder) -->
+  <div class="node-card" id="node2">
+    <div class="node-title">Node 2</div>
+    <div class="value" id="node2-water">-- cm</div>
+    <div class="value-label">Water Level</div>
+    <div class="value" id="node2-temp">-- °C</div>
+    <div class="value-label">Temperature</div>
+    <div class="value" id="node2-hum">-- %</div>
+    <div class="value-label">Humidity</div>
+    <div class="charts">
+      <canvas id="node2-water-chart"></canvas>
+      <canvas id="node2-temp-chart"></canvas>
+      <canvas id="node2-hum-chart"></canvas>
+    </div>
+  </div>
 
-  <script>
-    const topic = "esp32/dht22";
+  <!-- Node 3 (placeholder) -->
+  <div class="node-card" id="node3">
+    <div class="node-title">Node 3</div>
+    <div class="value" id="node3-water">-- cm</div>
+    <div class="value-label">Water Level</div>
+    <div class="value" id="node3-temp">-- °C</div>
+    <div class="value-label">Temperature</div>
+    <div class="value" id="node3-hum">-- %</div>
+    <div class="value-label">Humidity</div>
+    <div class="charts">
+      <canvas id="node3-water-chart"></canvas>
+      <canvas id="node3-temp-chart"></canvas>
+      <canvas id="node3-hum-chart"></canvas>
+    </div>
+  </div>
 
-    // MQTT Connection
-    const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+  <!-- Node 4 (placeholder) -->
+  <div class="node-card" id="node4">
+    <div class="node-title">Node 4</div>
+    <div class="value" id="node4-water">-- cm</div>
+    <div class="value-label">Water Level</div>
+    <div class="value" id="node4-temp">-- °C</div>
+    <div class="value-label">Temperature</div>
+    <div class="value" id="node4-hum">-- %</div>
+    <div class="value-label">Humidity</div>
+    <div class="charts">
+      <canvas id="node4-water-chart"></canvas>
+      <canvas id="node4-temp-chart"></canvas>
+      <canvas id="node4-hum-chart"></canvas>
+    </div>
+  </div>
+</div>
 
-    // Data arrays
-    const labels = [];
-    const tempData = [];
-    const humData = [];
+<script>
+const mqttBroker = "wss://broker.hivemq.com:8884/mqtt";
+const topics = ["esp32/node1"]; // only Node 1 active for now
 
-    // Create Charts
-    const tempChart = new Chart(document.getElementById("tempChart"), {
-      type: "line",
-      data: {
-        labels: labels,
-        datasets: [{
-          label: "Temperature (°C)",
-          data: tempData,
-          borderWidth: 2,
-          tension: 0.3
-        }]
-      }
-    });
+// Node 1 data arrays
+const labels = [[]];
+const dataTemp = [[]];
+const dataHum = [[]];
 
-    const humChart = new Chart(document.getElementById("humChart"), {
-      type: "line",
-      data: {
-        labels: labels,
-        datasets: [{
-          label: "Humidity (%)",
-          data: humData,
-          borderWidth: 2,
-          tension: 0.3
-        }]
-      }
-    });
+// Charts
+const tempChart = new Chart(document.getElementById("node1-temp-chart").getContext("2d"), {
+  type: "line",
+  data: { labels: labels[0], datasets:[{label:"Temp", data:dataTemp[0], borderColor:"#e74c3c", backgroundColor:"rgba(231,76,60,0.2)", fill:true, tension:0.3, borderWidth:1}]},
+  options:{responsive:false, animation:false, plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{beginAtZero:false}}}
+});
 
-    // MQTT Events
-    client.on("connect", () => {
-      document.getElementById("status").innerText = "✅ Connected";
-      client.subscribe(topic);
-    });
+const humChart = new Chart(document.getElementById("node1-hum-chart").getContext("2d"), {
+  type: "line",
+  data: { labels: labels[0], datasets:[{label:"Hum", data:dataHum[0], borderColor:"#3498db", backgroundColor:"rgba(52,152,219,0.2)", fill:true, tension:0.3, borderWidth:1}]},
+  options:{responsive:false, animation:false, plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{beginAtZero:true}}}
+});
 
-    client.on("message", (topic, message) => {
-      const msg = message.toString();
+// MQTT
+const client = mqtt.connect(mqttBroker);
 
-      try {
-        const data = JSON.parse(msg);
+client.on("connect", ()=>{
+  document.getElementById("status").innerText = "✅ Connected";
+  topics.forEach(t=>client.subscribe(t));
+});
+client.on("reconnect", ()=>document.getElementById("status").innerText="🔄 Reconnecting...");
+client.on("error", ()=>document.getElementById("status").innerText="❌ Error");
 
-        const temp = data.temp;
-        const hum = data.hum;
+client.on("message",(topic,msg)=>{
+  const data = JSON.parse(msg.toString()); // expect {"temp":value,"hum":value}
+  const temp = data.temp;
+  const hum = data.hum;
 
-        // Update values
-        document.getElementById("temperature").innerText = temp + " °C";
-        document.getElementById("humidity").innerText = hum + " %";
+  // Update Node 1 values
+  document.getElementById("node1-temp").innerText = temp+" °C";
+  document.getElementById("node1-hum").innerText = hum+" %";
 
-        // Time label
-        const time = new Date().toLocaleTimeString();
+  const time = new Date().toLocaleTimeString();
+  labels[0].push(time);
+  dataTemp[0].push(temp);
+  dataHum[0].push(hum);
 
-        labels.push(time);
-        tempData.push(temp);
-        humData.push(hum);
+  if(labels[0].length>20){
+    labels[0].shift(); dataTemp[0].shift(); dataHum[0].shift();
+  }
 
-        // Limit data points (last 20)
-        if (labels.length > 20) {
-          labels.shift();
-          tempData.shift();
-          humData.shift();
-        }
-
-        tempChart.update();
-        humChart.update();
-
-      } catch (e) {
-        document.getElementById("status").innerText = "⚠️ Invalid Data";
-      }
-    });
-
-    client.on("error", () => {
-      document.getElementById("status").innerText = "❌ Error";
-    });
-
-    client.on("reconnect", () => {
-      document.getElementById("status").innerText = "🔄 Reconnecting...";
-    });
-
-  </script>
+  tempChart.update();
+  humChart.update();
+});
+</script>
 
 </body>
 </html>
