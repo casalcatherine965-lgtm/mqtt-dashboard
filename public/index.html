@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <title>DHT22 Live Dashboard</title>
 
-  <!-- ✅ Stable MQTT Library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
+  <!-- ✅ MQTT.js (WORKS on Render) -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <style>
     body {
@@ -14,11 +14,10 @@
       padding: 50px;
       background: #f0f4f8;
     }
-    h1 { color: #333; }
 
     .reading {
       font-size: 2em;
-      margin: 20px 0;
+      margin: 20px;
       padding: 20px;
       background: #fff;
       border-radius: 10px;
@@ -44,7 +43,6 @@
     Humidity: <span id="humidity">--</span> %
   </div>
 
-  <!-- ✅ Debug Info -->
   <div class="status">
     Status: <span id="status">Connecting...</span><br>
     Last Message: <span id="lastmsg">None</span>
@@ -53,56 +51,34 @@
   <script>
     const topic = "esp32/dht22";
 
-    // ✅ Correct WebSocket connection
-    const client = new Paho.MQTT.Client(
-      "broker.hivemq.com",
-      8884,
-      "/mqtt",
-      "webclient_" + Date.now()
-    );
+    // ✅ Connect using MQTT.js over WSS
+    const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
 
-    // 🔌 When connection is lost
-    client.onConnectionLost = function(responseObject) {
-      document.getElementById("status").innerText = "❌ Disconnected";
-      setTimeout(connectMQTT, 3000);
-    };
+    client.on("connect", () => {
+      document.getElementById("status").innerText = "✅ Connected";
+      client.subscribe(topic);
+    });
 
-    // 📩 When message arrives
-    client.onMessageArrived = function(message) {
-      document.getElementById("lastmsg").innerText = message.payloadString;
+    client.on("message", (topic, message) => {
+      const msg = message.toString();
+      document.getElementById("lastmsg").innerText = msg;
 
       try {
-        const data = JSON.parse(message.payloadString);
-
+        const data = JSON.parse(msg);
         document.getElementById("temperature").innerText = data.temp ?? "--";
         document.getElementById("humidity").innerText = data.hum ?? "--";
-
       } catch (e) {
         document.getElementById("status").innerText = "⚠️ Invalid JSON";
       }
-    };
+    });
 
-    // 🔗 Connect function
-    function connectMQTT() {
-      client.connect({
-        useSSL: true,
-        cleanSession: true,
-        timeout: 5,
+    client.on("error", () => {
+      document.getElementById("status").innerText = "❌ Connection Error";
+    });
 
-        onSuccess: function () {
-          document.getElementById("status").innerText = "✅ Connected";
-          client.subscribe(topic);
-        },
-
-        onFailure: function (err) {
-          document.getElementById("status").innerText = "❌ Connection Failed";
-          setTimeout(connectMQTT, 5000);
-        }
-      });
-    }
-
-    // 🚀 Start connection
-    connectMQTT();
+    client.on("reconnect", () => {
+      document.getElementById("status").innerText = "🔄 Reconnecting...";
+    });
   </script>
 </body>
 </html>
