@@ -2,58 +2,122 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>DHT22 Live Dashboard</title>
+  <title>DHT22 IoT Dashboard</title>
 
-  <!-- ✅ MQTT.js (WORKS on Render) -->
+  <!-- MQTT -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body {
-      font-family: Arial;
+      font-family: 'Segoe UI', sans-serif;
+      background: #eef2f7;
+      margin: 0;
+      padding: 20px;
       text-align: center;
-      padding: 50px;
-      background: #f0f4f8;
     }
 
-    .reading {
-      font-size: 2em;
-      margin: 20px;
-      padding: 20px;
-      background: #fff;
-      border-radius: 10px;
-      display: inline-block;
-      min-width: 200px;
+    h1 {
+      margin-bottom: 10px;
     }
 
     .status {
-      margin-top: 20px;
-      font-size: 1.2em;
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+
+    .container {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      width: 220px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .value {
+      font-size: 2em;
+      margin-top: 10px;
+    }
+
+    canvas {
+      margin-top: 30px;
+      background: white;
+      border-radius: 12px;
+      padding: 10px;
+      max-width: 800px;
     }
   </style>
 </head>
 
 <body>
-  <h1>DHT22 Live Sensor Dashboard</h1>
 
-  <div class="reading">
-    Temperature: <span id="temperature">--</span> °C
+  <h1>🌡️ DHT22 IoT Monitoring Dashboard</h1>
+  <div class="status">Status: <span id="status">Connecting...</span></div>
+
+  <div class="container">
+    <div class="card">
+      Temperature
+      <div class="value" id="temperature">-- °C</div>
+    </div>
+
+    <div class="card">
+      Humidity
+      <div class="value" id="humidity">-- %</div>
+    </div>
   </div>
 
-  <div class="reading">
-    Humidity: <span id="humidity">--</span> %
-  </div>
-
-  <div class="status">
-    Status: <span id="status">Connecting...</span><br>
-    Last Message: <span id="lastmsg">None</span>
-  </div>
+  <!-- Charts -->
+  <canvas id="tempChart"></canvas>
+  <canvas id="humChart"></canvas>
 
   <script>
     const topic = "esp32/dht22";
 
-    // ✅ Connect using MQTT.js over WSS
+    // MQTT Connection
     const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
 
+    // Data arrays
+    const labels = [];
+    const tempData = [];
+    const humData = [];
+
+    // Create Charts
+    const tempChart = new Chart(document.getElementById("tempChart"), {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Temperature (°C)",
+          data: tempData,
+          borderWidth: 2,
+          tension: 0.3
+        }]
+      }
+    });
+
+    const humChart = new Chart(document.getElementById("humChart"), {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Humidity (%)",
+          data: humData,
+          borderWidth: 2,
+          tension: 0.3
+        }]
+      }
+    });
+
+    // MQTT Events
     client.on("connect", () => {
       document.getElementById("status").innerText = "✅ Connected";
       client.subscribe(topic);
@@ -61,24 +125,48 @@
 
     client.on("message", (topic, message) => {
       const msg = message.toString();
-      document.getElementById("lastmsg").innerText = msg;
 
       try {
         const data = JSON.parse(msg);
-        document.getElementById("temperature").innerText = data.temp ?? "--";
-        document.getElementById("humidity").innerText = data.hum ?? "--";
+
+        const temp = data.temp;
+        const hum = data.hum;
+
+        // Update values
+        document.getElementById("temperature").innerText = temp + " °C";
+        document.getElementById("humidity").innerText = hum + " %";
+
+        // Time label
+        const time = new Date().toLocaleTimeString();
+
+        labels.push(time);
+        tempData.push(temp);
+        humData.push(hum);
+
+        // Limit data points (last 20)
+        if (labels.length > 20) {
+          labels.shift();
+          tempData.shift();
+          humData.shift();
+        }
+
+        tempChart.update();
+        humChart.update();
+
       } catch (e) {
-        document.getElementById("status").innerText = "⚠️ Invalid JSON";
+        document.getElementById("status").innerText = "⚠️ Invalid Data";
       }
     });
 
     client.on("error", () => {
-      document.getElementById("status").innerText = "❌ Connection Error";
+      document.getElementById("status").innerText = "❌ Error";
     });
 
     client.on("reconnect", () => {
       document.getElementById("status").innerText = "🔄 Reconnecting...";
     });
+
   </script>
+
 </body>
 </html>
