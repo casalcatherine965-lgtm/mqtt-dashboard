@@ -3,10 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <title>DHT22 Live Dashboard</title>
-  <script src="https://unpkg.com/paho-mqtt/mqttws31.js"></script>
+
+  <!-- ✅ Stable MQTT Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
+
   <style>
-    body { font-family: Arial; text-align: center; padding: 50px; background: #f0f4f8; }
+    body {
+      font-family: Arial;
+      text-align: center;
+      padding: 50px;
+      background: #f0f4f8;
+    }
     h1 { color: #333; }
+
     .reading {
       font-size: 2em;
       margin: 20px 0;
@@ -16,59 +25,84 @@
       display: inline-block;
       min-width: 200px;
     }
+
+    .status {
+      margin-top: 20px;
+      font-size: 1.2em;
+    }
   </style>
 </head>
+
 <body>
   <h1>DHT22 Live Sensor Dashboard</h1>
+
   <div class="reading">
     Temperature: <span id="temperature">--</span> °C
   </div>
+
   <div class="reading">
     Humidity: <span id="humidity">--</span> %
   </div>
 
+  <!-- ✅ Debug Info -->
+  <div class="status">
+    Status: <span id="status">Connecting...</span><br>
+    Last Message: <span id="lastmsg">None</span>
+  </div>
+
   <script>
-    // HiveMQ public broker settings (secure WebSocket)
-    const broker = "broker.hivemq.com";
-    const port = 8884;  // Secure WebSocket port (WSS)
-    const topic = "esp32/dht22";  // ESP32 publishes here
+    const topic = "esp32/dht22";
 
-    // Create MQTT client
-    const client = new Paho.MQTT.Client(broker, port, "webclient_" + Math.random());
+    // ✅ Correct WebSocket connection
+    const client = new Paho.MQTT.Client(
+      "broker.hivemq.com",
+      8884,
+      "/mqtt",
+      "webclient_" + Date.now()
+    );
 
-    // Callback for connection loss
+    // 🔌 When connection is lost
     client.onConnectionLost = function(responseObject) {
-      console.log("Connection lost:", responseObject.errorMessage);
-      setTimeout(connectMQTT, 3000); // Reconnect after 3 seconds
+      document.getElementById("status").innerText = "❌ Disconnected";
+      setTimeout(connectMQTT, 3000);
     };
 
-    // Callback for incoming messages
+    // 📩 When message arrives
     client.onMessageArrived = function(message) {
+      document.getElementById("lastmsg").innerText = message.payloadString;
+
       try {
         const data = JSON.parse(message.payloadString);
-        // Update the dashboard with data
-        document.getElementById("temperature").innerText = data.temp;
-        document.getElementById("humidity").innerText = data.hum;
+
+        document.getElementById("temperature").innerText = data.temp ?? "--";
+        document.getElementById("humidity").innerText = data.hum ?? "--";
+
       } catch (e) {
-        console.error("Invalid JSON:", message.payloadString);
+        document.getElementById("status").innerText = "⚠️ Invalid JSON";
       }
     };
 
-    // Function to connect to MQTT broker
+    // 🔗 Connect function
     function connectMQTT() {
       client.connect({
-        onSuccess: function() {
-          console.log("Connected to HiveMQ public broker");
-          client.subscribe(topic);  // Subscribe to the ESP32 topic
+        useSSL: true,
+        cleanSession: true,
+        timeout: 5,
+
+        onSuccess: function () {
+          document.getElementById("status").innerText = "✅ Connected";
+          client.subscribe(topic);
         },
-        onFailure: function(err) {
-          console.error("Connection failed:", err);
-          setTimeout(connectMQTT, 5000); // Retry every 5 seconds if connection fails
+
+        onFailure: function (err) {
+          document.getElementById("status").innerText = "❌ Connection Failed";
+          setTimeout(connectMQTT, 5000);
         }
       });
     }
 
-    connectMQTT();  // Initial connection attempt
+    // 🚀 Start connection
+    connectMQTT();
   </script>
 </body>
 </html>
