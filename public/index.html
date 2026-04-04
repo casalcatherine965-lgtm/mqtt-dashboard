@@ -13,7 +13,7 @@
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #eef2f7;
+      background: #f5f7fa;
       margin: 0;
       padding: 20px;
       text-align: center;
@@ -21,11 +21,13 @@
 
     h1 {
       margin-bottom: 10px;
+      color: #2c3e50;
     }
 
     .status {
       margin-bottom: 20px;
       font-weight: bold;
+      color: #34495e;
     }
 
     .container {
@@ -40,15 +42,20 @@
       padding: 20px;
       border-radius: 12px;
       width: 220px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      transition: transform 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
     }
 
     .value {
       font-size: 2em;
       margin-top: 10px;
+      color: #2c3e50;
     }
 
-    /* 👇 Charts container */
     .charts {
       display: flex;
       justify-content: center;
@@ -58,125 +65,172 @@
     }
 
     canvas {
-      background: white;
+      background: #ffffff;
       border-radius: 12px;
       padding: 10px;
-      width: 350px !important;
+      width: 360px !important;
       height: 250px !important;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
     }
   </style>
 </head>
 
 <body>
 
-  <h1>🌡️ DHT22 IoT Monitoring Dashboard</h1>
-  <div class="status">Status: <span id="status">Connecting...</span></div>
+<h1>🌡️ DHT22 IoT Monitoring Dashboard</h1>
+<div class="status">Status: <span id="status">Connecting...</span></div>
 
-  <div class="container">
-    <div class="card">
-      Temperature
-      <div class="value" id="temperature">-- °C</div>
-    </div>
-
-    <div class="card">
-      Humidity
-      <div class="value" id="humidity">-- %</div>
-    </div>
+<div class="container">
+  <div class="card">
+    Temperature
+    <div class="value" id="temperature">-- °C</div>
   </div>
 
-  <!-- 👇 Smaller Charts -->
-  <div class="charts">
-    <canvas id="tempChart"></canvas>
-    <canvas id="humChart"></canvas>
+  <div class="card">
+    Humidity
+    <div class="value" id="humidity">-- %</div>
   </div>
+</div>
 
-  <script>
-    const topic = "esp32/dht22";
+<div class="charts">
+  <canvas id="tempChart"></canvas>
+  <canvas id="humChart"></canvas>
+</div>
 
-    const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+<script>
+const topic = "esp32/dht22";
+const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
 
-    const labels = [];
-    const tempData = [];
-    const humData = [];
+const labels = [];
+const tempData = [];
+const humData = [];
 
-    // 🌡️ Temperature Chart (RED)
-    const tempChart = new Chart(document.getElementById("tempChart"), {
-      type: "line",
-      data: {
-        labels: labels,
-        datasets: [{
-          label: "Temperature (°C)",
-          data: tempData,
-          borderColor: "#e74c3c",
-          backgroundColor: "rgba(231,76,60,0.2)",
-          borderWidth: 2,
-          tension: 0.3,
-          fill: true
-        }]
+// Gradient for Temperature
+const tempGradient = document.getElementById("tempChart").getContext('2d');
+const tempFill = tempGradient.createLinearGradient(0,0,0,250);
+tempFill.addColorStop(0, 'rgba(231,76,60,0.4)');
+tempFill.addColorStop(1, 'rgba(231,76,60,0.05)');
+
+// Gradient for Humidity
+const humGradient = document.getElementById("humChart").getContext('2d');
+const humFill = humGradient.createLinearGradient(0,0,0,250);
+humFill.addColorStop(0, 'rgba(52,152,219,0.4)');
+humFill.addColorStop(1, 'rgba(52,152,219,0.05)');
+
+// Temperature Chart
+const tempChart = new Chart(document.getElementById("tempChart"), {
+  type: "line",
+  data: {
+    labels: labels,
+    datasets: [{
+      label: "Temperature (°C)",
+      data: tempData,
+      borderColor: "#e74c3c",
+      backgroundColor: tempFill,
+      borderWidth: 2,
+      tension: 0.3,
+      fill: true,
+      pointRadius: 3,
+      pointHoverRadius: 6
+    }]
+  },
+  options: {
+    responsive: false,
+    animation: { duration: 300 },
+    plugins: {
+      legend: { display: false },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    scales: {
+      x: { 
+        display: true, 
+        grid: { color: '#ecf0f1' },
+        ticks: { color: '#34495e' }
+      },
+      y: { 
+        beginAtZero: false, 
+        grid: { color: '#ecf0f1' },
+        ticks: { color: '#34495e' }
       }
-    });
+    }
+  }
+});
 
-    // 💧 Humidity Chart (BLUE)
-    const humChart = new Chart(document.getElementById("humChart"), {
-      type: "line",
-      data: {
-        labels: labels,
-        datasets: [{
-          label: "Humidity (%)",
-          data: humData,
-          borderColor: "#3498db",
-          backgroundColor: "rgba(52,152,219,0.2)",
-          borderWidth: 2,
-          tension: 0.3,
-          fill: true
-        }]
+// Humidity Chart
+const humChart = new Chart(document.getElementById("humChart"), {
+  type: "line",
+  data: {
+    labels: labels,
+    datasets: [{
+      label: "Humidity (%)",
+      data: humData,
+      borderColor: "#3498db",
+      backgroundColor: humFill,
+      borderWidth: 2,
+      tension: 0.3,
+      fill: true,
+      pointRadius: 3,
+      pointHoverRadius: 6
+    }]
+  },
+  options: {
+    responsive: false,
+    animation: { duration: 300 },
+    plugins: {
+      legend: { display: false },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    scales: {
+      x: { 
+        display: true, 
+        grid: { color: '#ecf0f1' },
+        ticks: { color: '#34495e' }
+      },
+      y: { 
+        beginAtZero: true, 
+        grid: { color: '#ecf0f1' },
+        ticks: { color: '#34495e' }
       }
-    });
+    }
+  }
+});
 
-    client.on("connect", () => {
-      document.getElementById("status").innerText = "✅ Connected";
-      client.subscribe(topic);
-    });
+// MQTT
+client.on("connect", () => {
+  document.getElementById("status").innerText = "✅ Connected";
+  client.subscribe(topic);
+});
 
-    client.on("message", (topic, message) => {
-      try {
-        const data = JSON.parse(message.toString());
+client.on("message", (topic, message) => {
+  try {
+    const data = JSON.parse(message.toString());
+    const temp = data.temp;
+    const hum = data.hum;
 
-        const temp = data.temp;
-        const hum = data.hum;
+    document.getElementById("temperature").innerText = temp + " °C";
+    document.getElementById("humidity").innerText = hum + " %";
 
-        document.getElementById("temperature").innerText = temp + " °C";
-        document.getElementById("humidity").innerText = hum + " %";
+    const time = new Date().toLocaleTimeString();
+    labels.push(time);
+    tempData.push(temp);
+    humData.push(hum);
 
-        const time = new Date().toLocaleTimeString();
+    if(labels.length > 20){
+      labels.shift();
+      tempData.shift();
+      humData.shift();
+    }
 
-        labels.push(time);
-        tempData.push(temp);
-        humData.push(hum);
+    tempChart.update();
+    humChart.update();
+  } catch(e){
+    document.getElementById("status").innerText = "⚠️ Invalid Data";
+  }
+});
 
-        if (labels.length > 20) {
-          labels.shift();
-          tempData.shift();
-          humData.shift();
-        }
-
-        tempChart.update();
-        humChart.update();
-
-      } catch (e) {
-        document.getElementById("status").innerText = "⚠️ Invalid Data";
-      }
-    });
-
-    client.on("error", () => {
-      document.getElementById("status").innerText = "❌ Error";
-    });
-
-    client.on("reconnect", () => {
-      document.getElementById("status").innerText = "🔄 Reconnecting...";
-    });
-  </script>
+client.on("error", () => document.getElementById("status").innerText = "❌ Error");
+client.on("reconnect", () => document.getElementById("status").innerText = "🔄 Reconnecting...");
+</script>
 
 </body>
 </html>
