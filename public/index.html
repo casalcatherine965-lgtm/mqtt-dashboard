@@ -28,9 +28,9 @@
   </div>
 
   <script>
-    // HiveMQ public broker settings
+    // HiveMQ public broker settings (secure WebSocket)
     const broker = "broker.hivemq.com";
-    const port = 8000; // WebSocket port (public)
+    const port = 8884;  // Secure WebSocket port (WSS)
     const topic = "esp32/dht22";  // ESP32 publishes here
 
     // Create MQTT client
