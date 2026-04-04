@@ -73,6 +73,11 @@ button {
   position: relative;
 }
 
+.gauge-box canvas {
+  width: 100% !important;
+  height: 120px !important; /* fixed height for proper rendering */
+}
+
 .gauge-label {
   position: absolute;
   width: 100%;
@@ -80,11 +85,6 @@ button {
   bottom: 5px;
   font-size: 0.75em;
   color: #ccc;
-}
-
-canvas {
-  width: 100% !important;
-  height: auto !important;
 }
 </style>
 </head>
@@ -178,7 +178,7 @@ function toggleView(node){
   const gauge = document.getElementById(`node${node}-gauge`);
   if(viewState[node] === "graph"){
     graph.style.display = "none";
-    gauge.style.display = "flex";
+    gauge.style.display = "block";
     viewState[node] = "gauge";
   } else {
     graph.style.display = "block";
@@ -232,17 +232,17 @@ const chart1 = new Chart(document.getElementById("chart1"), {
       y:{
         display:true,
         grid:{ color:"rgba(255,255,255,0.1)" },
-        ticks:{ color:"#ccc", font:{size:10} }
+        ticks:{ color:"#ccc", font:{size:10}, stepSize:10 } // <--- step in tens
       }
     }
   }
 });
 
-// Gauge function with labeled scale
-function createGauge(canvasId, maxVal, color){
+// Gauge creation with colored zones
+function createGauge(canvasId, maxVal, zones){
   return new Chart(document.getElementById(canvasId), {
     type: "doughnut",
-    data: { datasets:[{ data:[0,maxVal], backgroundColor:[color,"#444"], borderWidth:0 }] },
+    data: { datasets:[{ data:[0,maxVal], backgroundColor:[zones[0],"#444"], borderWidth:0 }] },
     options:{
       responsive:true,
       maintainAspectRatio:false,
@@ -255,10 +255,14 @@ function createGauge(canvasId, maxVal, color){
   });
 }
 
-// Node 1 gauges
-const gaugeTemp = createGauge("gauge-temp",50,"#e74c3c");
-const gaugeHum = createGauge("gauge-hum",100,"#3498db");
-const gaugeWater = createGauge("gauge-water",24,"#2ecc71");
+// Colored zones
+const tempZone = "#e74c3c"; // red
+const humZone = "#3498db"; // blue
+const waterZone = "#2ecc71"; // green
+
+const gaugeTemp = createGauge("gauge-temp",50,[tempZone]);
+const gaugeHum = createGauge("gauge-hum",100,[humZone]);
+const gaugeWater = createGauge("gauge-water",24,[waterZone]);
 
 // MQTT
 client.on("connect", ()=>{
@@ -281,7 +285,7 @@ client.on("message",(topic,message)=>{
     tempData.push(temp);
     humData.push(hum);
 
-    if(labels.length>7){ // last 7 readings
+    if(labels.length>7){ 
       labels.shift();
       tempData.shift();
       humData.shift();
@@ -289,11 +293,10 @@ client.on("message",(topic,message)=>{
 
     chart1.update();
 
-    // Update gauges with smooth animation
+    // Update gauges
     gaugeTemp.data.datasets[0].data = [temp, 50-temp];
     gaugeHum.data.datasets[0].data = [hum, 100-hum];
     gaugeWater.data.datasets[0].data = [0, 24]; // placeholder
-
     gaugeTemp.update();
     gaugeHum.update();
     gaugeWater.update();
