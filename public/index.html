@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AWD Dashboard</title>
+<title>AWD Dashboard - Node 1</title>
 
+<!-- MQTT & Chart.js -->
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -21,7 +22,7 @@ h1 { padding: 15px; margin: 0; }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
   gap: 15px;
   padding: 15px;
 }
@@ -31,7 +32,7 @@ h1 { padding: 15px; margin: 0; }
   border-radius: 10px;
   padding: 12px;
   box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-  min-height: 300px;
+  min-height: 360px;
 }
 
 .title { font-size: 1em; margin-bottom: 5px; }
@@ -75,7 +76,7 @@ button {
 
 .gauge-box canvas {
   width: 100% !important;
-  height: 120px !important; /* fixed height for proper rendering */
+  height: 120px !important;
 }
 
 .gauge-label {
@@ -91,12 +92,11 @@ button {
 
 <body>
 
-<h1>🌾 AWD Monitoring Dashboard</h1>
+<h1>🌾 AWD Monitoring Dashboard - Node 1</h1>
 <div class="status">Status: <span id="status">Connecting...</span></div>
 
 <div class="grid">
 
-  <!-- NODE 1 -->
   <div class="card">
     <div class="title">Node 1 (ACTIVE)</div>
     <button onclick="toggleView(1)">Toggle View</button>
@@ -107,7 +107,7 @@ button {
     </div>
 
     <!-- GRAPH -->
-    <div id="node1-graph" style="height:160px;">
+    <div id="node1-graph" style="height:180px;">
       <canvas id="chart1"></canvas>
     </div>
 
@@ -130,48 +130,13 @@ button {
     </div>
   </div>
 
-  <!-- NODE 2 -->
-  <div class="card">
-    <div class="title">Node 2</div>
-    <button onclick="toggleView(2)">Toggle View</button>
-    <div class="values">
-      <div class="value">Temp <span>--</span></div>
-      <div class="value">Hum <span>--</span></div>
-      <div class="value">Water Level <span>--</span></div>
-    </div>
-    <div><canvas></canvas></div>
-  </div>
-
-  <!-- NODE 3 -->
-  <div class="card">
-    <div class="title">Node 3</div>
-    <button onclick="toggleView(3)">Toggle View</button>
-    <div class="values">
-      <div class="value">Temp <span>--</span></div>
-      <div class="value">Hum <span>--</span></div>
-      <div class="value">Water Level <span>--</span></div>
-    </div>
-    <div><canvas></canvas></div>
-  </div>
-
-  <!-- NODE 4 -->
-  <div class="card">
-    <div class="title">Node 4</div>
-    <button onclick="toggleView(4)">Toggle View</button>
-    <div class="values">
-      <div class="value">Temp <span>--</span></div>
-      <div class="value">Hum <span>--</span></div>
-      <div class="value">Water Level <span>--</span></div>
-    </div>
-    <div><canvas></canvas></div>
-  </div>
-
 </div>
 
 <script>
 const topic = "esp32/dht22";
 const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
 
+// Toggle graph/gauge view
 let viewState = {1:"graph"};
 function toggleView(node){
   const graph = document.getElementById(`node${node}-graph`);
@@ -187,12 +152,12 @@ function toggleView(node){
   }
 }
 
-// Node 1 Data
+// Node 1 Graph Data
 const labels = [];
 const tempData = [];
 const humData = [];
 
-// Graph
+// Node 1 Graph
 const chart1 = new Chart(document.getElementById("chart1"), {
   type: "line",
   data: {
@@ -205,7 +170,8 @@ const chart1 = new Chart(document.getElementById("chart1"), {
         backgroundColor:"rgba(231,76,60,0.2)",
         tension:0.4,
         borderWidth:2,
-        fill:true
+        fill:true,
+        yAxisID:"yTemp"
       },
       {
         label:"Hum (%)",
@@ -214,7 +180,8 @@ const chart1 = new Chart(document.getElementById("chart1"), {
         backgroundColor:"rgba(52,152,219,0.2)",
         tension:0.4,
         borderWidth:2,
-        fill:true
+        fill:true,
+        yAxisID:"yHum"
       }
     ]
   },
@@ -222,27 +189,40 @@ const chart1 = new Chart(document.getElementById("chart1"), {
     responsive:true,
     maintainAspectRatio:false,
     animation: { duration:600, easing:'easeOutQuart' },
-    plugins: { legend: { display:false }},
+    plugins: { legend: { display:true, labels:{color:"#fff"} }},
     scales: {
       x:{
         display:true,
         ticks:{ color:"#ccc", font:{size:10}, maxRotation:45, minRotation:30 },
         grid:{ color:"rgba(255,255,255,0.1)" }
       },
-      y:{
-        display:true,
+      yTemp:{
+        type:"linear",
+        position:"left",
+        min:0,
+        max:50,
+        stepSize:10,
         grid:{ color:"rgba(255,255,255,0.1)" },
-        ticks:{ color:"#ccc", font:{size:10}, stepSize:10 } // <--- step in tens
+        ticks:{ color:"#e74c3c" }
+      },
+      yHum:{
+        type:"linear",
+        position:"right",
+        min:0,
+        max:100,
+        stepSize:10,
+        grid:{ drawOnChartArea:false },
+        ticks:{ color:"#3498db" }
       }
     }
   }
 });
 
-// Gauge creation with colored zones
-function createGauge(canvasId, maxVal, zones){
+// Gauges
+function createGauge(canvasId, maxVal, color){
   return new Chart(document.getElementById(canvasId), {
-    type: "doughnut",
-    data: { datasets:[{ data:[0,maxVal], backgroundColor:[zones[0],"#444"], borderWidth:0 }] },
+    type:"doughnut",
+    data:{ datasets:[{ data:[0,maxVal], backgroundColor:[color,"#444"], borderWidth:0 }] },
     options:{
       responsive:true,
       maintainAspectRatio:false,
@@ -255,14 +235,9 @@ function createGauge(canvasId, maxVal, zones){
   });
 }
 
-// Colored zones
-const tempZone = "#e74c3c"; // red
-const humZone = "#3498db"; // blue
-const waterZone = "#2ecc71"; // green
-
-const gaugeTemp = createGauge("gauge-temp",50,[tempZone]);
-const gaugeHum = createGauge("gauge-hum",100,[humZone]);
-const gaugeWater = createGauge("gauge-water",24,[waterZone]);
+const gaugeTemp = createGauge("gauge-temp",50,"#e74c3c");
+const gaugeHum = createGauge("gauge-hum",100,"#3498db");
+const gaugeWater = createGauge("gauge-water",24,"#2ecc71");
 
 // MQTT
 client.on("connect", ()=>{
@@ -275,9 +250,11 @@ client.on("message",(topic,message)=>{
     const data = JSON.parse(message.toString());
     const temp = data.temp;
     const hum = data.hum;
+    const water = data.water !== undefined ? data.water : 0; // dynamic water
 
-    document.getElementById("n1-temp").innerText=temp+"°C";
-    document.getElementById("n1-hum").innerText=hum+"%";
+    document.getElementById("n1-temp").innerText = temp + "°C";
+    document.getElementById("n1-hum").innerText = hum + "%";
+    document.getElementById("n1-water").innerText = water + " in";
 
     const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 
@@ -285,7 +262,7 @@ client.on("message",(topic,message)=>{
     tempData.push(temp);
     humData.push(hum);
 
-    if(labels.length>7){ 
+    if(labels.length > 7){ 
       labels.shift();
       tempData.shift();
       humData.shift();
@@ -296,7 +273,7 @@ client.on("message",(topic,message)=>{
     // Update gauges
     gaugeTemp.data.datasets[0].data = [temp, 50-temp];
     gaugeHum.data.datasets[0].data = [hum, 100-hum];
-    gaugeWater.data.datasets[0].data = [0, 24]; // placeholder
+    gaugeWater.data.datasets[0].data = [water, 24-water];
     gaugeTemp.update();
     gaugeHum.update();
     gaugeWater.update();
