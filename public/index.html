@@ -31,7 +31,7 @@ h1 { padding: 15px; margin: 0; }
   border-radius: 10px;
   padding: 12px;
   box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-  min-height: 260px;
+  min-height: 300px;
 }
 
 .title { font-size: 1em; margin-bottom: 5px; }
@@ -64,11 +64,22 @@ button {
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  margin-top: 5px;
 }
 
 .gauge-box {
   width: 30%;
-  height: 120px;
+  height: 140px;
+  position: relative;
+}
+
+.gauge-label {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  bottom: 5px;
+  font-size: 0.75em;
+  color: #ccc;
 }
 
 canvas {
@@ -103,9 +114,18 @@ canvas {
     <!-- GAUGES -->
     <div id="node1-gauge" style="display:none;">
       <div class="gauges">
-        <div class="gauge-box"><canvas id="gauge-temp"></canvas></div>
-        <div class="gauge-box"><canvas id="gauge-hum"></canvas></div>
-        <div class="gauge-box"><canvas id="gauge-water"></canvas></div>
+        <div class="gauge-box">
+          <canvas id="gauge-temp"></canvas>
+          <div class="gauge-label">0–50 °C</div>
+        </div>
+        <div class="gauge-box">
+          <canvas id="gauge-hum"></canvas>
+          <div class="gauge-label">0–100 %</div>
+        </div>
+        <div class="gauge-box">
+          <canvas id="gauge-water"></canvas>
+          <div class="gauge-label">0–24 in</div>
+        </div>
       </div>
     </div>
   </div>
@@ -158,7 +178,7 @@ function toggleView(node){
   const gauge = document.getElementById(`node${node}-gauge`);
   if(viewState[node] === "graph"){
     graph.style.display = "none";
-    gauge.style.display = "block";
+    gauge.style.display = "flex";
     viewState[node] = "gauge";
   } else {
     graph.style.display = "block";
@@ -218,11 +238,11 @@ const chart1 = new Chart(document.getElementById("chart1"), {
   }
 });
 
-// Gauge creation function
-function createGauge(canvasId, color){
+// Gauge function with labeled scale
+function createGauge(canvasId, maxVal, color){
   return new Chart(document.getElementById(canvasId), {
     type: "doughnut",
-    data: { datasets:[{ data:[0,100], backgroundColor:[color,"#444"], borderWidth:0 }] },
+    data: { datasets:[{ data:[0,maxVal], backgroundColor:[color,"#444"], borderWidth:0 }] },
     options:{
       responsive:true,
       maintainAspectRatio:false,
@@ -236,9 +256,9 @@ function createGauge(canvasId, color){
 }
 
 // Node 1 gauges
-const gaugeTemp = createGauge("gauge-temp","#e74c3c");
-const gaugeHum = createGauge("gauge-hum","#3498db");
-const gaugeWater = createGauge("gauge-water","#2ecc71");
+const gaugeTemp = createGauge("gauge-temp",50,"#e74c3c");
+const gaugeHum = createGauge("gauge-hum",100,"#3498db");
+const gaugeWater = createGauge("gauge-water",24,"#2ecc71");
 
 // MQTT
 client.on("connect", ()=>{
@@ -272,7 +292,7 @@ client.on("message",(topic,message)=>{
     // Update gauges with smooth animation
     gaugeTemp.data.datasets[0].data = [temp, 50-temp];
     gaugeHum.data.datasets[0].data = [hum, 100-hum];
-    gaugeWater.data.datasets[0].data = [0, 100]; // placeholder
+    gaugeWater.data.datasets[0].data = [0, 24]; // placeholder
 
     gaugeTemp.update();
     gaugeHum.update();
