@@ -34,14 +34,16 @@ h1 { padding: 15px; margin: 0; }
   box-shadow: 0 3px 8px rgba(0,0,0,0.3);
 }
 
-.title {
-  font-size: 1em;
-  margin-bottom: 5px;
-}
+.title { font-size: 1em; margin-bottom: 5px; }
 
-.active-badge {
-  font-size: 0.7em;
-  color: #2ecc71;
+button {
+  background: #3498db;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  margin-bottom: 5px;
 }
 
 .values {
@@ -73,46 +75,68 @@ canvas {
 
   <!-- NODE 1 -->
   <div class="card">
-    <div class="title">Node 1 <span class="active-badge">(ACTIVE)</span></div>
+    <div class="title">Node 1 (ACTIVE)</div>
+
+    <button onclick="toggleView(1)">Toggle View</button>
+
     <div class="values">
       <div class="value">Temp <span id="n1-temp">--</span></div>
       <div class="value">Hum <span id="n1-hum">--</span></div>
-      <div class="value">Water <span id="n1-water">--</span></div>
+      <div class="value">Water Level <span id="n1-water">--</span></div>
     </div>
-    <canvas id="chart1"></canvas>
+
+    <div id="node1-graph">
+      <canvas id="chart1"></canvas>
+    </div>
+
+    <div id="node1-gauge" style="display:none;">
+      <canvas id="gauge1"></canvas>
+    </div>
   </div>
 
   <!-- NODE 2 -->
   <div class="card">
     <div class="title">Node 2</div>
+    <button onclick="toggleView(2)">Toggle View</button>
+
     <div class="values">
       <div class="value">Temp <span id="n2-temp">--</span></div>
       <div class="value">Hum <span id="n2-hum">--</span></div>
-      <div class="value">Water <span id="n2-water">--</span></div>
+      <div class="value">Water Level <span id="n2-water">--</span></div>
     </div>
-    <canvas id="chart2"></canvas>
+
+    <div id="node2-graph"><canvas id="chart2"></canvas></div>
+    <div id="node2-gauge" style="display:none;"><canvas id="gauge2"></canvas></div>
   </div>
 
   <!-- NODE 3 -->
   <div class="card">
     <div class="title">Node 3</div>
+    <button onclick="toggleView(3)">Toggle View</button>
+
     <div class="values">
       <div class="value">Temp <span id="n3-temp">--</span></div>
       <div class="value">Hum <span id="n3-hum">--</span></div>
-      <div class="value">Water <span id="n3-water">--</span></div>
+      <div class="value">Water Level <span id="n3-water">--</span></div>
     </div>
-    <canvas id="chart3"></canvas>
+
+    <div id="node3-graph"><canvas id="chart3"></canvas></div>
+    <div id="node3-gauge" style="display:none;"><canvas id="gauge3"></canvas></div>
   </div>
 
   <!-- NODE 4 -->
   <div class="card">
     <div class="title">Node 4</div>
+    <button onclick="toggleView(4)">Toggle View</button>
+
     <div class="values">
       <div class="value">Temp <span id="n4-temp">--</span></div>
       <div class="value">Hum <span id="n4-hum">--</span></div>
-      <div class="value">Water <span id="n4-water">--</span></div>
+      <div class="value">Water Level <span id="n4-water">--</span></div>
     </div>
-    <canvas id="chart4"></canvas>
+
+    <div id="node4-graph"><canvas id="chart4"></canvas></div>
+    <div id="node4-gauge" style="display:none;"><canvas id="gauge4"></canvas></div>
   </div>
 
 </div>
@@ -121,51 +145,100 @@ canvas {
 const topic = "esp32/dht22";
 const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
 
-// Data arrays (Node 1 only for now)
+let viewState = {1:"graph",2:"graph",3:"graph",4:"graph"};
+
+function toggleView(node){
+  const graph = document.getElementById(`node${node}-graph`);
+  const gauge = document.getElementById(`node${node}-gauge`);
+
+  if(viewState[node] === "graph"){
+    graph.style.display = "none";
+    gauge.style.display = "block";
+    viewState[node] = "gauge";
+  } else {
+    graph.style.display = "block";
+    gauge.style.display = "none";
+    viewState[node] = "graph";
+  }
+}
+
+// Node 1 data
 const labels1 = [];
 const temp1 = [];
 const hum1 = [];
 
-// Create charts for all nodes
-function createChart(canvasId, tempData, humData, labels){
-  return new Chart(document.getElementById(canvasId), {
+// Create chart
+function createChart(id, tData, hData, labels){
+  return new Chart(document.getElementById(id), {
     type: "line",
     data: {
       labels: labels,
       datasets: [
-        { data: tempData, borderColor: "#e74c3c", tension: 0.3 },
-        { data: humData, borderColor: "#3498db", tension: 0.3 }
+        { data: tData, borderColor:"#e74c3c", tension:0.3, borderWidth:2 },
+        { data: hData, borderColor:"#3498db", tension:0.3, borderWidth:2 }
       ]
     },
     options: {
-      responsive: false,
-      plugins: { legend: { display: false }},
-      scales: { x: { display: false }, y: { display: false }}
+      responsive:false,
+      plugins:{ legend:{display:false}},
+      scales:{
+        x:{ display:false },
+        y:{
+          display:true,
+          grid:{ color:"rgba(255,255,255,0.1)" },
+          ticks:{ color:"#ccc", font:{size:10}}
+        }
+      }
+    }
+  });
+}
+
+// Create gauge
+function createGauge(id){
+  return new Chart(document.getElementById(id), {
+    type: "doughnut",
+    data: {
+      datasets: [{
+        data: [0,100],
+        backgroundColor: ["#e74c3c","#444"],
+        borderWidth:0
+      }]
+    },
+    options:{
+      rotation:-90,
+      circumference:180,
+      cutout:"70%",
+      plugins:{legend:{display:false}}
     }
   });
 }
 
 // Charts
 const chart1 = createChart("chart1", temp1, hum1, labels1);
-const chart2 = createChart("chart2", [], [], []);
-const chart3 = createChart("chart3", [], [], []);
-const chart4 = createChart("chart4", [], [], []);
+createChart("chart2", [], [], []);
+createChart("chart3", [], [], []);
+createChart("chart4", [], [], []);
 
-client.on("connect", () => {
-  document.getElementById("status").innerText = "✅ Connected";
+// Gauges
+const gauge1 = createGauge("gauge1");
+createGauge("gauge2");
+createGauge("gauge3");
+createGauge("gauge4");
+
+// MQTT
+client.on("connect", ()=>{
+  document.getElementById("status").innerText="✅ Connected";
   client.subscribe(topic);
 });
 
-client.on("message", (topic, message) => {
-  try {
+client.on("message",(topic,message)=>{
+  try{
     const data = JSON.parse(message.toString());
-
     const temp = data.temp;
     const hum = data.hum;
 
-    // Update Node 1 only
-    document.getElementById("n1-temp").innerText = temp + "°C";
-    document.getElementById("n1-hum").innerText = hum + "%";
+    document.getElementById("n1-temp").innerText=temp+"°C";
+    document.getElementById("n1-hum").innerText=hum+"%";
 
     const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 
@@ -173,7 +246,7 @@ client.on("message", (topic, message) => {
     temp1.push(temp);
     hum1.push(hum);
 
-    if(labels1.length > 7){
+    if(labels1.length>7){
       labels1.shift();
       temp1.shift();
       hum1.shift();
@@ -181,13 +254,17 @@ client.on("message", (topic, message) => {
 
     chart1.update();
 
-  } catch(e){
-    document.getElementById("status").innerText = "⚠️ Invalid Data";
+    // Update gauge
+    gauge1.data.datasets[0].data = [temp, 50-temp];
+    gauge1.update();
+
+  }catch(e){
+    document.getElementById("status").innerText="⚠️ Invalid Data";
   }
 });
 
-client.on("error", () => document.getElementById("status").innerText = "❌ Error");
-client.on("reconnect", () => document.getElementById("status").innerText = "🔄 Reconnecting...");
+client.on("error",()=>document.getElementById("status").innerText="❌ Error");
+client.on("reconnect",()=>document.getElementById("status").innerText="🔄 Reconnecting...");
 </script>
 
 </body>
