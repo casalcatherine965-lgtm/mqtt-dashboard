@@ -35,19 +35,21 @@
   </div>
 
   <script>
-    // Connect to HiveMQ public broker using WebSocket (port 8000)
+    // Connect to HiveMQ public broker using WebSocket
     var client = new Paho.MQTT.Client("broker.hivemq.com", 8000, "webclient_" + Math.random());
 
     client.onConnectionLost = function(responseObject) {
       console.log("Connection lost: " + responseObject.errorMessage);
-      setTimeout(connectMQTT, 3000); // retry after 3 sec
+      setTimeout(connectMQTT, 3000);
     };
 
     client.onMessageArrived = function(message) {
       try {
         var data = JSON.parse(message.payloadString);
-        document.getElementById("temperature").innerText = data.temperature;
-        document.getElementById("humidity").innerText = data.humidity;
+
+        // Adjusted to match ESP32 JSON fields
+        document.getElementById("temperature").innerText = data.temp;
+        document.getElementById("humidity").innerText = data.hum;
       } catch (e) {
         console.error("Invalid JSON: ", message.payloadString);
       }
