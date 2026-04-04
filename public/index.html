@@ -153,7 +153,6 @@ const topic = "esp32/dht22";
 const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
 
 let viewState = {1:"graph"};
-
 function toggleView(node){
   const graph = document.getElementById(`node${node}-graph`);
   const gauge = document.getElementById(`node${node}-gauge`);
@@ -202,13 +201,14 @@ const chart1 = new Chart(document.getElementById("chart1"), {
   options: {
     responsive:true,
     maintainAspectRatio:false,
-    animation: {
-      duration: 600,
-      easing: 'easeOutQuart'
-    },
+    animation: { duration:600, easing:'easeOutQuart' },
     plugins: { legend: { display:false }},
     scales: {
-      x:{ display:false },
+      x:{
+        display:true,
+        ticks:{ color:"#ccc", font:{size:10}, maxRotation:45, minRotation:30 },
+        grid:{ color:"rgba(255,255,255,0.1)" }
+      },
       y:{
         display:true,
         grid:{ color:"rgba(255,255,255,0.1)" },
@@ -218,7 +218,7 @@ const chart1 = new Chart(document.getElementById("chart1"), {
   }
 });
 
-// Gauge creation function with smooth animation
+// Gauge creation function
 function createGauge(canvasId, color){
   return new Chart(document.getElementById(canvasId), {
     type: "doughnut",
@@ -261,7 +261,7 @@ client.on("message",(topic,message)=>{
     tempData.push(temp);
     humData.push(hum);
 
-    if(labels.length>7){
+    if(labels.length>7){ // last 7 readings
       labels.shift();
       tempData.shift();
       humData.shift();
