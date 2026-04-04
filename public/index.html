@@ -17,7 +17,6 @@ body {
 }
 
 h1 { padding: 15px; margin: 0; }
-
 .status { margin-bottom: 10px; font-weight: bold; }
 
 .grid {
@@ -32,6 +31,7 @@ h1 { padding: 15px; margin: 0; }
   border-radius: 10px;
   padding: 12px;
   box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  min-height: 260px;
 }
 
 .title { font-size: 1em; margin-bottom: 5px; }
@@ -62,12 +62,18 @@ button {
 /* Gauges layout */
 .gauges {
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gauge-box {
+  width: 30%;
+  height: 120px;
 }
 
 canvas {
   width: 100% !important;
-  height: 120px !important;
+  height: auto !important;
 }
 </style>
 </head>
@@ -82,9 +88,7 @@ canvas {
   <!-- NODE 1 -->
   <div class="card">
     <div class="title">Node 1 (ACTIVE)</div>
-
     <button onclick="toggleView(1)">Toggle View</button>
-
     <div class="values">
       <div class="value">Temp <span id="n1-temp">--</span></div>
       <div class="value">Hum <span id="n1-hum">--</span></div>
@@ -92,16 +96,16 @@ canvas {
     </div>
 
     <!-- GRAPH -->
-    <div id="node1-graph">
+    <div id="node1-graph" style="height:160px;">
       <canvas id="chart1"></canvas>
     </div>
 
     <!-- GAUGES -->
     <div id="node1-gauge" style="display:none;">
       <div class="gauges">
-        <canvas id="gauge-temp"></canvas>
-        <canvas id="gauge-hum"></canvas>
-        <canvas id="gauge-water"></canvas>
+        <div class="gauge-box"><canvas id="gauge-temp"></canvas></div>
+        <div class="gauge-box"><canvas id="gauge-hum"></canvas></div>
+        <div class="gauge-box"><canvas id="gauge-water"></canvas></div>
       </div>
     </div>
   </div>
@@ -153,7 +157,6 @@ let viewState = {1:"graph"};
 function toggleView(node){
   const graph = document.getElementById(`node${node}-graph`);
   const gauge = document.getElementById(`node${node}-gauge`);
-
   if(viewState[node] === "graph"){
     graph.style.display = "none";
     gauge.style.display = "block";
@@ -165,56 +168,74 @@ function toggleView(node){
   }
 }
 
-// DATA
+// Node 1 Data
 const labels = [];
 const tempData = [];
 const humData = [];
 
-// GRAPH
+// Graph
 const chart1 = new Chart(document.getElementById("chart1"), {
   type: "line",
   data: {
     labels: labels,
     datasets: [
-      { data: tempData, borderColor:"#e74c3c", tension:0.3 },
-      { data: humData, borderColor:"#3498db", tension:0.3 }
+      {
+        label:"Temp (°C)",
+        data: tempData,
+        borderColor:"#e74c3c",
+        backgroundColor:"rgba(231,76,60,0.2)",
+        tension:0.4,
+        borderWidth:2,
+        fill:true
+      },
+      {
+        label:"Hum (%)",
+        data: humData,
+        borderColor:"#3498db",
+        backgroundColor:"rgba(52,152,219,0.2)",
+        tension:0.4,
+        borderWidth:2,
+        fill:true
+      }
     ]
   },
   options: {
-    responsive:false,
-    plugins:{legend:{display:false}},
-    scales:{
-      x:{display:false},
+    responsive:true,
+    maintainAspectRatio:false,
+    animation: {
+      duration: 600,
+      easing: 'easeOutQuart'
+    },
+    plugins: { legend: { display:false }},
+    scales: {
+      x:{ display:false },
       y:{
         display:true,
-        grid:{color:"rgba(255,255,255,0.1)"},
-        ticks:{color:"#ccc"}
+        grid:{ color:"rgba(255,255,255,0.1)" },
+        ticks:{ color:"#ccc", font:{size:10} }
       }
     }
   }
 });
 
-// GAUGE FUNCTION
+// Gauge creation function with smooth animation
 function createGauge(canvasId, color){
   return new Chart(document.getElementById(canvasId), {
     type: "doughnut",
-    data: {
-      datasets: [{
-        data: [0,100],
-        backgroundColor: [color,"#444"],
-        borderWidth:0
-      }]
-    },
+    data: { datasets:[{ data:[0,100], backgroundColor:[color,"#444"], borderWidth:0 }] },
     options:{
+      responsive:true,
+      maintainAspectRatio:false,
       rotation:-90,
       circumference:180,
       cutout:"70%",
-      plugins:{legend:{display:false}}
+      animation:{ animateRotate:true, duration:800, easing:'easeOutQuart' },
+      plugins:{ legend:{display:false}}
     }
   });
 }
 
-// 3 gauges
+// Node 1 gauges
 const gaugeTemp = createGauge("gauge-temp","#e74c3c");
 const gaugeHum = createGauge("gauge-hum","#3498db");
 const gaugeWater = createGauge("gauge-water","#2ecc71");
@@ -248,7 +269,7 @@ client.on("message",(topic,message)=>{
 
     chart1.update();
 
-    // update gauges
+    // Update gauges with smooth animation
     gaugeTemp.data.datasets[0].data = [temp, 50-temp];
     gaugeHum.data.datasets[0].data = [hum, 100-hum];
     gaugeWater.data.datasets[0].data = [0, 100]; // placeholder
@@ -257,7 +278,7 @@ client.on("message",(topic,message)=>{
     gaugeHum.update();
     gaugeWater.update();
 
-  }catch(e){
+  } catch(e) {
     document.getElementById("status").innerText="⚠️ Invalid Data";
   }
 });
