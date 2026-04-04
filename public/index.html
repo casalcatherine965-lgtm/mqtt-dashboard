@@ -35,8 +35,15 @@
   </div>
 
   <script>
-    // Connect to HiveMQ public broker using WebSocket
-    var client = new Paho.MQTT.Client("broker.hivemq.com", 8000, "webclient_" + Math.random());
+    // ===== HiveMQ Cloud Settings =====
+    const broker = "1956694161de4eb899ebb06b4935709e.s1.eu.hivemq.cloud";
+    const port = 8884; // TLS WebSocket port
+    const username = "catherine";
+    const password = "Catherine1";
+    const topic = "esp32/dht22";
+
+    // Create MQTT client
+    const client = new Paho.MQTT.Client(broker, port, "webclient_" + Math.random());
 
     client.onConnectionLost = function(responseObject) {
       console.log("Connection lost: " + responseObject.errorMessage);
@@ -45,25 +52,26 @@
 
     client.onMessageArrived = function(message) {
       try {
-        var data = JSON.parse(message.payloadString);
-
-        // Adjusted to match ESP32 JSON fields
+        const data = JSON.parse(message.payloadString);
         document.getElementById("temperature").innerText = data.temp;
         document.getElementById("humidity").innerText = data.hum;
       } catch (e) {
-        console.error("Invalid JSON: ", message.payloadString);
+        console.error("Invalid JSON:", message.payloadString);
       }
     };
 
     function connectMQTT() {
       client.connect({
+        useSSL: true,            // Enable TLS
+        userName: username,
+        password: password,
         onSuccess: function() {
-          console.log("Connected to HiveMQ");
-          client.subscribe("esp32/dht22");
+          console.log("Connected to HiveMQ Cloud");
+          client.subscribe(topic);
         },
         onFailure: function(err) {
-          console.error("Connection failed: ", err);
-          setTimeout(connectMQTT, 3000);
+          console.error("Connection failed:", err);
+          setTimeout(connectMQTT, 5000);
         }
       });
     }
