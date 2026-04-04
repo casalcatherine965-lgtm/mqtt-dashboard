@@ -50,6 +50,7 @@ button {
   display: flex;
   justify-content: space-around;
   font-size: 0.85em;
+  margin-bottom: 5px;
 }
 
 .value span {
@@ -58,8 +59,13 @@ button {
   font-weight: bold;
 }
 
+/* Gauges layout */
+.gauges {
+  display: flex;
+  justify-content: space-around;
+}
+
 canvas {
-  margin-top: 8px;
   width: 100% !important;
   height: 120px !important;
 }
@@ -85,12 +91,18 @@ canvas {
       <div class="value">Water Level <span id="n1-water">--</span></div>
     </div>
 
+    <!-- GRAPH -->
     <div id="node1-graph">
       <canvas id="chart1"></canvas>
     </div>
 
+    <!-- GAUGES -->
     <div id="node1-gauge" style="display:none;">
-      <canvas id="gauge1"></canvas>
+      <div class="gauges">
+        <canvas id="gauge-temp"></canvas>
+        <canvas id="gauge-hum"></canvas>
+        <canvas id="gauge-water"></canvas>
+      </div>
     </div>
   </div>
 
@@ -98,45 +110,36 @@ canvas {
   <div class="card">
     <div class="title">Node 2</div>
     <button onclick="toggleView(2)">Toggle View</button>
-
     <div class="values">
-      <div class="value">Temp <span id="n2-temp">--</span></div>
-      <div class="value">Hum <span id="n2-hum">--</span></div>
-      <div class="value">Water Level <span id="n2-water">--</span></div>
+      <div class="value">Temp <span>--</span></div>
+      <div class="value">Hum <span>--</span></div>
+      <div class="value">Water Level <span>--</span></div>
     </div>
-
-    <div id="node2-graph"><canvas id="chart2"></canvas></div>
-    <div id="node2-gauge" style="display:none;"><canvas id="gauge2"></canvas></div>
+    <div><canvas></canvas></div>
   </div>
 
   <!-- NODE 3 -->
   <div class="card">
     <div class="title">Node 3</div>
     <button onclick="toggleView(3)">Toggle View</button>
-
     <div class="values">
-      <div class="value">Temp <span id="n3-temp">--</span></div>
-      <div class="value">Hum <span id="n3-hum">--</span></div>
-      <div class="value">Water Level <span id="n3-water">--</span></div>
+      <div class="value">Temp <span>--</span></div>
+      <div class="value">Hum <span>--</span></div>
+      <div class="value">Water Level <span>--</span></div>
     </div>
-
-    <div id="node3-graph"><canvas id="chart3"></canvas></div>
-    <div id="node3-gauge" style="display:none;"><canvas id="gauge3"></canvas></div>
+    <div><canvas></canvas></div>
   </div>
 
   <!-- NODE 4 -->
   <div class="card">
     <div class="title">Node 4</div>
     <button onclick="toggleView(4)">Toggle View</button>
-
     <div class="values">
-      <div class="value">Temp <span id="n4-temp">--</span></div>
-      <div class="value">Hum <span id="n4-hum">--</span></div>
-      <div class="value">Water Level <span id="n4-water">--</span></div>
+      <div class="value">Temp <span>--</span></div>
+      <div class="value">Hum <span>--</span></div>
+      <div class="value">Water Level <span>--</span></div>
     </div>
-
-    <div id="node4-graph"><canvas id="chart4"></canvas></div>
-    <div id="node4-gauge" style="display:none;"><canvas id="gauge4"></canvas></div>
+    <div><canvas></canvas></div>
   </div>
 
 </div>
@@ -145,7 +148,7 @@ canvas {
 const topic = "esp32/dht22";
 const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
 
-let viewState = {1:"graph",2:"graph",3:"graph",4:"graph"};
+let viewState = {1:"graph"};
 
 function toggleView(node){
   const graph = document.getElementById(`node${node}-graph`);
@@ -162,45 +165,43 @@ function toggleView(node){
   }
 }
 
-// Node 1 data
-const labels1 = [];
-const temp1 = [];
-const hum1 = [];
+// DATA
+const labels = [];
+const tempData = [];
+const humData = [];
 
-// Create chart
-function createChart(id, tData, hData, labels){
-  return new Chart(document.getElementById(id), {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        { data: tData, borderColor:"#e74c3c", tension:0.3, borderWidth:2 },
-        { data: hData, borderColor:"#3498db", tension:0.3, borderWidth:2 }
-      ]
-    },
-    options: {
-      responsive:false,
-      plugins:{ legend:{display:false}},
-      scales:{
-        x:{ display:false },
-        y:{
-          display:true,
-          grid:{ color:"rgba(255,255,255,0.1)" },
-          ticks:{ color:"#ccc", font:{size:10}}
-        }
+// GRAPH
+const chart1 = new Chart(document.getElementById("chart1"), {
+  type: "line",
+  data: {
+    labels: labels,
+    datasets: [
+      { data: tempData, borderColor:"#e74c3c", tension:0.3 },
+      { data: humData, borderColor:"#3498db", tension:0.3 }
+    ]
+  },
+  options: {
+    responsive:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{display:false},
+      y:{
+        display:true,
+        grid:{color:"rgba(255,255,255,0.1)"},
+        ticks:{color:"#ccc"}
       }
     }
-  });
-}
+  }
+});
 
-// Create gauge
-function createGauge(id){
-  return new Chart(document.getElementById(id), {
+// GAUGE FUNCTION
+function createGauge(canvasId, color){
+  return new Chart(document.getElementById(canvasId), {
     type: "doughnut",
     data: {
       datasets: [{
         data: [0,100],
-        backgroundColor: ["#e74c3c","#444"],
+        backgroundColor: [color,"#444"],
         borderWidth:0
       }]
     },
@@ -213,17 +214,10 @@ function createGauge(id){
   });
 }
 
-// Charts
-const chart1 = createChart("chart1", temp1, hum1, labels1);
-createChart("chart2", [], [], []);
-createChart("chart3", [], [], []);
-createChart("chart4", [], [], []);
-
-// Gauges
-const gauge1 = createGauge("gauge1");
-createGauge("gauge2");
-createGauge("gauge3");
-createGauge("gauge4");
+// 3 gauges
+const gaugeTemp = createGauge("gauge-temp","#e74c3c");
+const gaugeHum = createGauge("gauge-hum","#3498db");
+const gaugeWater = createGauge("gauge-water","#2ecc71");
 
 // MQTT
 client.on("connect", ()=>{
@@ -242,21 +236,26 @@ client.on("message",(topic,message)=>{
 
     const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 
-    labels1.push(time);
-    temp1.push(temp);
-    hum1.push(hum);
+    labels.push(time);
+    tempData.push(temp);
+    humData.push(hum);
 
-    if(labels1.length>7){
-      labels1.shift();
-      temp1.shift();
-      hum1.shift();
+    if(labels.length>7){
+      labels.shift();
+      tempData.shift();
+      humData.shift();
     }
 
     chart1.update();
 
-    // Update gauge
-    gauge1.data.datasets[0].data = [temp, 50-temp];
-    gauge1.update();
+    // update gauges
+    gaugeTemp.data.datasets[0].data = [temp, 50-temp];
+    gaugeHum.data.datasets[0].data = [hum, 100-hum];
+    gaugeWater.data.datasets[0].data = [0, 100]; // placeholder
+
+    gaugeTemp.update();
+    gaugeHum.update();
+    gaugeWater.update();
 
   }catch(e){
     document.getElementById("status").innerText="⚠️ Invalid Data";
