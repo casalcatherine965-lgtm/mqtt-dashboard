@@ -20,24 +20,22 @@ body {
   font-family: 'Segoe UI', sans-serif;
   background: #1f253d;
   color: #fff;
-  text-align: center;
 }
 
-h1 { padding: 15px; margin: 0; }
-.status { margin-bottom: 10px; font-weight: bold; }
+h1 { text-align: center; padding: 15px; margin:0; }
+.status { text-align: center; margin-bottom: 10px; font-weight: bold; }
 
 .container {
   display: flex;
   justify-content: center;
-  flex-wrap: wrap;
   gap: 20px;
+  flex-wrap: wrap;
 }
 
 .card {
   background: #2c3246;
   border-radius: 10px;
   padding: 15px;
-  width: 750px;
   display: flex;
   gap: 20px;
   box-shadow: 0 3px 8px rgba(0,0,0,0.3);
@@ -48,7 +46,7 @@ h1 { padding: 15px; margin: 0; }
 }
 
 .right-panel {
-  flex: 0 0 60px;
+  flex: 0 0 50px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -63,17 +61,16 @@ h1 { padding: 15px; margin: 0; }
 
 .value span {
   display: block;
-  font-size: 1.4em;
+  font-size: 1.2em;
   font-weight: bold;
 }
 
 /* Water bar */
 .water-bar-container {
   position: relative;
-  width: 20px;
-  height: 300px; /* same as graph height */
+  width: 25px;
+  height: 300px; /* same height as chart */
   background: #333;
-  border: 2px solid #555;
   border-radius: 5px;
   overflow: hidden;
   display: flex;
@@ -88,7 +85,7 @@ h1 { padding: 15px; margin: 0; }
 
 .water-labels {
   position: absolute;
-  left: 25px;
+  left: 30px;
   top: 0;
   height: 100%;
   display: flex;
@@ -117,11 +114,11 @@ h1 { padding: 15px; margin: 0; }
     </div>
 
     <div class="right-panel">
-      <h4>Water Level</h4>
       <div class="water-bar-container">
         <div id="waterBar" class="water-bar"></div>
         <div class="water-labels" id="waterLabels"></div>
       </div>
+      <div style="margin-top:5px; font-size:0.9em;">Water Level</div>
     </div>
   </div>
 </div>
@@ -178,7 +175,7 @@ const waterBar = document.getElementById("waterBar");
 const waterLabels = document.getElementById("waterLabels");
 const MAX_WATER = 60; // cm
 
-// Add labels dynamically
+// Add labels
 for(let i=0;i<=MAX_WATER;i+=10){
   const span = document.createElement("span");
   span.innerText = i;
