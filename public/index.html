@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AWD Monitoring Dashboard</title>
+<title>AWD Final Dashboard</title>
 
 <!-- MQTT -->
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -15,31 +15,68 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <style>
-body { margin:0; font-family: 'Segoe UI', sans-serif; background:#1f253d; color:#fff; text-align:center;}
-h1 { padding:15px; margin:0;}
-.status { margin-bottom:10px; font-weight:bold; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: #1f253d;
+  color: #fff;
+  text-align: center;
+}
 
-.card { background:#2c3246; border-radius:10px; padding:12px; margin:15px; box-shadow:0 3px 8px rgba(0,0,0,0.3);}
-.values { display:flex; justify-content:space-around; margin-bottom:10px;}
-.value span { display:block; font-size:1.4em; font-weight:bold;}
+h1 { padding: 15px; margin: 0; }
+.status { margin-bottom: 10px; font-weight: bold; }
+
+.card {
+  background: #2c3246;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 15px auto;
+  max-width: 900px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+}
+
+.values {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 10px;
+}
+
+.value span {
+  display: block;
+  font-size: 1.4em;
+  font-weight: bold;
+}
 
 /* Gauges */
-.gauges { display:flex; justify-content:space-around; }
-.gauge-box { width:30%; }
-canvas { width:100% !important; height:140px !important; }
+.gauges {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 15px;
+}
+
+.gauge-box {
+  width: 28%;
+}
+
+canvas {
+  width: 100% !important;
+  height: 140px !important;
+}
 </style>
 </head>
 
 <body>
+
 <h1>🌾 AWD Monitoring Dashboard</h1>
 <div class="status">Status: <span id="status">Connecting...</span></div>
 
 <div class="card">
   <h3>Node 1</h3>
+
   <div class="values">
-    <div class="value">Temp <span id="temp">--</span></div>
-    <div class="value">Hum <span id="hum">--</span></div>
-    <div class="value">Water Level <span id="water">--</span></div>
+    <div class="value">Temp <span id="temp">--</span> °C</div>
+    <div class="value">Hum <span id="hum">--</span> %</div>
+    <div class="value">Water <span id="water">--</span> in</div>
   </div>
 
   <canvas id="chart"></canvas>
@@ -63,36 +100,58 @@ const firebaseConfig = {
   appId: "1:261523660331:web:6225e6bb71b5555c31546e",
   measurementId: "G-95ZLFJ4649"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // ================= MQTT =================
-const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt"); // HiveMQ WebSocket
+const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
 
 client.on("connect", ()=>{
   document.getElementById("status").innerText="✅ Connected";
   client.subscribe("esp32/dht22");
 });
 
-// ================= GRAPH =================
-const labels=[], tempData=[], humData=[], waterData=[];
+client.on("reconnect", ()=>{
+  document.getElementById("status").innerText="🔄 Reconnecting...";
+});
 
+client.on("error", ()=>{
+  document.getElementById("status").innerText="❌ Error";
+});
+
+// ================= GRAPH =================
+const labels=[], tempData=[], humData=[];
 const chart = new Chart(document.getElementById("chart"), {
   type:"line",
   data:{
     labels,
     datasets:[
-      { label:"Temp", data:tempData, borderColor:"#e74c3c", fill:true, yAxisID:"y1" },
-      { label:"Hum", data:humData, borderColor:"#3498db", fill:true, yAxisID:"y2" },
-      { label:"Water Level", data:waterData, borderColor:"#2ecc71", fill:true, yAxisID:"y3" }
+      {
+        label:"Temp (°C)",
+        data:tempData,
+        borderColor:"#e74c3c",
+        backgroundColor:"rgba(231,76,60,0.2)",
+        fill:true,
+        yAxisID:"y1",
+        tension:0.3
+      },
+      {
+        label:"Hum (%)",
+        data:humData,
+        borderColor:"#3498db",
+        backgroundColor:"rgba(52,152,219,0.2)",
+        fill:true,
+        yAxisID:"y2",
+        tension:0.3
+      }
     ]
   },
   options:{
+    animation:{duration:500},
+    responsive:true,
     scales:{
-      y1:{min:0,max:50,ticks:{stepSize:10}, position:"left"},
-      y2:{min:0,max:100,ticks:{stepSize:10}, position:"right"},
-      y3:{min:0,max:24,ticks:{stepSize:2}, position:"right"}
+      y1:{min:0,max:50,ticks:{stepSize:10}},
+      y2:{position:"right",min:0,max:100,ticks:{stepSize:10}}
     }
   }
 });
@@ -102,42 +161,68 @@ function createGauge(id,max,color){
   return new Chart(document.getElementById(id),{
     type:"doughnut",
     data:{datasets:[{data:[0,max],backgroundColor:[color,"#444"]}]},
-    options:{rotation:-90, circumference:180, cutout:"70%"}
+    options:{
+      rotation:-90,
+      circumference:180,
+      cutout:"70%",
+      animation:{animateRotate:true,animateScale:true}
+    }
   });
 }
-
 const gTemp=createGauge("gTemp",50,"#e74c3c");
 const gHum=createGauge("gHum",100,"#3498db");
 const gWater=createGauge("gWater",24,"#2ecc71");
 
 // ================= DATA FLOW =================
 client.on("message",(topic,msg)=>{
-  const data=JSON.parse(msg.toString());
-  const temp=data.temp;
-  const hum=data.hum;
-  const water=data.water || 0;
+  try{
+    const data=JSON.parse(msg.toString());
+    
+    // Safe defaults
+    const temp = (typeof data.temp === "number") ? data.temp : 0;
+    const hum = (typeof data.hum === "number") ? data.hum : 0;
+    const water = (typeof data.water === "number") ? data.water : 0;
 
-  // Update UI
-  document.getElementById("temp").innerText=temp+"°C";
-  document.getElementById("hum").innerText=hum+"%";
-  document.getElementById("water").innerText=water+" in";
+    // Update UI
+    document.getElementById("temp").innerText=temp+"°C";
+    document.getElementById("hum").innerText=hum+"%";
+    document.getElementById("water").innerText=water+" in";
 
-  // Graph
-  const t=new Date().toLocaleTimeString();
-  labels.push(t); tempData.push(temp); humData.push(hum); waterData.push(water);
-  if(labels.length>7){ labels.shift(); tempData.shift(); humData.shift(); waterData.shift(); }
-  chart.update();
+    // Graph
+    const t=new Date().toLocaleTimeString();
+    labels.push(t);
+    tempData.push(temp);
+    humData.push(hum);
 
-  // Gauges
-  gTemp.data.datasets[0].data=[temp,50-temp];
-  gHum.data.datasets[0].data=[hum,100-hum];
-  gWater.data.datasets[0].data=[water,24-water];
-  gTemp.update(); gHum.update(); gWater.update();
+    if(labels.length>7){
+      labels.shift();
+      tempData.shift();
+      humData.shift();
+    }
+    chart.update();
 
-  // Firebase
-  db.ref("node1/latest").set({ temp, hum, water, time: Date.now() });
-  db.ref("node1/history").push({ temp, hum, water, time: new Date().toLocaleString() });
+    // Gauges
+    gTemp.data.datasets[0].data=[temp,50-temp];
+    gHum.data.datasets[0].data=[hum,100-hum];
+    gWater.data.datasets[0].data=[water,24-water];
+    gTemp.update();
+    gHum.update();
+    gWater.update();
+
+    // ================= SAVE TO FIREBASE =================
+    db.ref("node1/latest").set({
+      temp, hum, water, time: Date.now()
+    });
+
+    db.ref("node1/history").push({
+      temp, hum, water, time: new Date().toLocaleString()
+    });
+
+  }catch(e){
+    console.error("Invalid MQTT JSON",e);
+  }
 });
 </script>
+
 </body>
 </html>
