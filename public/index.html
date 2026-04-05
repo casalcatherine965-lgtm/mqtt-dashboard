@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AWD Final Dashboard</title>
+<title>AWD Monitoring Dashboard</title>
 
 <!-- MQTT -->
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -15,66 +15,31 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <style>
-body {
-  margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: #1f253d;
-  color: #fff;
-  text-align: center;
-}
+body { margin:0; font-family: 'Segoe UI', sans-serif; background:#1f253d; color:#fff; text-align:center;}
+h1 { padding:15px; margin:0;}
+.status { margin-bottom:10px; font-weight:bold; }
 
-h1 { padding: 15px; margin: 0; }
-.status { margin-bottom: 10px; font-weight: bold; }
-
-.card {
-  background: #2c3246;
-  border-radius: 10px;
-  padding: 12px;
-  margin: 15px;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-}
-
-.values {
-  display: flex;
-  justify-content: space-around;
-  margin-bottom: 10px;
-}
-
-.value span {
-  display: block;
-  font-size: 1.4em;
-  font-weight: bold;
-}
+.card { background:#2c3246; border-radius:10px; padding:12px; margin:15px; box-shadow:0 3px 8px rgba(0,0,0,0.3);}
+.values { display:flex; justify-content:space-around; margin-bottom:10px;}
+.value span { display:block; font-size:1.4em; font-weight:bold;}
 
 /* Gauges */
-.gauges {
-  display: flex;
-  justify-content: space-around;
-}
-
-.gauge-box {
-  width: 30%;
-}
-
-canvas {
-  width: 100% !important;
-  height: 140px !important;
-}
+.gauges { display:flex; justify-content:space-around; }
+.gauge-box { width:30%; }
+canvas { width:100% !important; height:140px !important; }
 </style>
 </head>
 
 <body>
-
 <h1>🌾 AWD Monitoring Dashboard</h1>
 <div class="status">Status: <span id="status">Connecting...</span></div>
 
 <div class="card">
   <h3>Node 1</h3>
-
   <div class="values">
     <div class="value">Temp <span id="temp">--</span></div>
     <div class="value">Hum <span id="hum">--</span></div>
-    <div class="value">Water <span id="water">--</span></div>
+    <div class="value">Water Level <span id="water">--</span></div>
   </div>
 
   <canvas id="chart"></canvas>
@@ -103,7 +68,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // ================= MQTT =================
-const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt"); // HiveMQ WebSocket
 
 client.on("connect", ()=>{
   document.getElementById("status").innerText="✅ Connected";
@@ -111,33 +76,23 @@ client.on("connect", ()=>{
 });
 
 // ================= GRAPH =================
-const labels=[], tempData=[], humData=[];
+const labels=[], tempData=[], humData=[], waterData=[];
 
 const chart = new Chart(document.getElementById("chart"), {
   type:"line",
   data:{
     labels,
     datasets:[
-      {
-        label:"Temp",
-        data:tempData,
-        borderColor:"#e74c3c",
-        fill:true,
-        yAxisID:"y1"
-      },
-      {
-        label:"Hum",
-        data:humData,
-        borderColor:"#3498db",
-        fill:true,
-        yAxisID:"y2"
-      }
+      { label:"Temp", data:tempData, borderColor:"#e74c3c", fill:true, yAxisID:"y1" },
+      { label:"Hum", data:humData, borderColor:"#3498db", fill:true, yAxisID:"y2" },
+      { label:"Water Level", data:waterData, borderColor:"#2ecc71", fill:true, yAxisID:"y3" }
     ]
   },
   options:{
     scales:{
-      y1:{min:0,max:50,ticks:{stepSize:10}},
-      y2:{position:"right",min:0,max:100,ticks:{stepSize:10}}
+      y1:{min:0,max:50,ticks:{stepSize:10}, position:"left"},
+      y2:{min:0,max:100,ticks:{stepSize:10}, position:"right"},
+      y3:{min:0,max:24,ticks:{stepSize:2}, position:"right"}
     }
   }
 });
@@ -147,11 +102,7 @@ function createGauge(id,max,color){
   return new Chart(document.getElementById(id),{
     type:"doughnut",
     data:{datasets:[{data:[0,max],backgroundColor:[color,"#444"]}]},
-    options:{
-      rotation:-90,
-      circumference:180,
-      cutout:"70%"
-    }
+    options:{rotation:-90, circumference:180, cutout:"70%"}
   });
 }
 
@@ -162,7 +113,6 @@ const gWater=createGauge("gWater",24,"#2ecc71");
 // ================= DATA FLOW =================
 client.on("message",(topic,msg)=>{
   const data=JSON.parse(msg.toString());
-
   const temp=data.temp;
   const hum=data.hum;
   const water=data.water || 0;
@@ -174,37 +124,20 @@ client.on("message",(topic,msg)=>{
 
   // Graph
   const t=new Date().toLocaleTimeString();
-  labels.push(t);
-  tempData.push(temp);
-  humData.push(hum);
-
-  if(labels.length>7){
-    labels.shift();
-    tempData.shift();
-    humData.shift();
-  }
-
+  labels.push(t); tempData.push(temp); humData.push(hum); waterData.push(water);
+  if(labels.length>7){ labels.shift(); tempData.shift(); humData.shift(); waterData.shift(); }
   chart.update();
 
   // Gauges
   gTemp.data.datasets[0].data=[temp,50-temp];
   gHum.data.datasets[0].data=[hum,100-hum];
   gWater.data.datasets[0].data=[water,24-water];
+  gTemp.update(); gHum.update(); gWater.update();
 
-  gTemp.update();
-  gHum.update();
-  gWater.update();
-
-  // ================= SAVE TO FIREBASE =================
-  db.ref("node1/latest").set({
-    temp, hum, water, time: Date.now()
-  });
-
-  db.ref("node1/history").push({
-    temp, hum, water, time: new Date().toLocaleString()
-  });
+  // Firebase
+  db.ref("node1/latest").set({ temp, hum, water, time: Date.now() });
+  db.ref("node1/history").push({ temp, hum, water, time: new Date().toLocaleString() });
 });
 </script>
-
 </body>
 </html>
