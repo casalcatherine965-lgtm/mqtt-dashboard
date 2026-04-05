@@ -22,6 +22,7 @@ body {
   color: #fff;
   text-align: center;
 }
+
 h1 { padding: 15px; margin: 0; }
 .status { margin-bottom: 10px; font-weight: bold; }
 
@@ -36,7 +37,7 @@ h1 { padding: 15px; margin: 0; }
   background: #2c3246;
   border-radius: 10px;
   padding: 15px;
-  width: 700px;
+  width: 750px;
   display: flex;
   gap: 20px;
   box-shadow: 0 3px 8px rgba(0,0,0,0.3);
@@ -51,6 +52,7 @@ h1 { padding: 15px; margin: 0; }
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: space-between;
 }
 
 .values {
@@ -65,23 +67,22 @@ h1 { padding: 15px; margin: 0; }
   font-weight: bold;
 }
 
-/* Slim vertical water bar */
+/* Water bar */
 .water-bar-container {
   position: relative;
-  height: 200px;
   width: 20px;
-  margin: 10px 0;
+  background: #333;
   border: 2px solid #555;
   border-radius: 5px;
-  background: #333;
   overflow: hidden;
+  flex: 1; /* match height of left panel */
+  display: flex;
+  flex-direction: column-reverse;
 }
 
 .water-bar {
-  position: absolute;
-  bottom: 0;
   width: 100%;
-  height: 0;
+  height: 0%;
   transition: height 0.5s ease;
 }
 
@@ -89,9 +90,9 @@ h1 { padding: 15px; margin: 0; }
   position: absolute;
   left: 25px;
   top: 0;
-  height: 200px;
+  bottom: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   justify-content: space-between;
   font-size: 0.8em;
   color: #fff;
@@ -176,6 +177,8 @@ const chart = new Chart(document.getElementById("chart"),{
 const waterBar = document.getElementById("waterBar");
 const waterLabels = document.getElementById("waterLabels");
 const MAX_WATER = 60; // cm
+
+// Add labels
 for(let i=0;i<=MAX_WATER;i+=10){
   const span = document.createElement("span");
   span.innerText = i;
@@ -186,7 +189,6 @@ function updateWaterBar(value){
   const percent = Math.min(Math.max(value,0)/MAX_WATER,1);
   waterBar.style.height = (percent*100)+"%";
 
-  // color zones
   if(percent<0.5) waterBar.style.backgroundColor="#2ecc71"; // green
   else if(percent<0.8) waterBar.style.backgroundColor="#f1c40f"; // yellow
   else waterBar.style.backgroundColor="#e74c3c"; // red
@@ -219,7 +221,6 @@ client.on("message",(topic,msg)=>{
 
     updateWaterBar(water);
 
-    // SAVE TO FIREBASE
     db.ref("node1/latest").set({temp, hum, water, time: Date.now()});
     db.ref("node1/history").push({temp, hum, water, time: timeLabel});
 
