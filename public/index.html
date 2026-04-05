@@ -2,65 +2,30 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>DHT22 Dashboard with Needle Gauges</title>
+<title>DHT22 Dashboard</title>
 
-<!-- MQTT -->
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<!-- Chart.js Gauge Plugin -->
-<script src="https://cdn.jsdelivr.net/npm/chartjs-gauge"></script>
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <style>
-body {
-  font-family: 'Segoe UI', sans-serif;
-  background: #1f253d;
-  color: #fff;
-  text-align: center;
-  margin: 0;
-  padding: 10px;
-}
-
-h1 { margin: 10px; font-size: 1.5em; }
-.status { font-weight: bold; margin-bottom: 10px; }
-
-.card {
-  background: #2c3246;
-  border-radius: 10px;
-  padding: 10px;
-  margin: 10px auto;
-  max-width: 500px;
-}
-
-.values {
-  display: flex;
-  justify-content: space-around;
-  margin-bottom: 10px;
-}
-
-.value span {
-  display: block;
-  font-size: 1.4em;
-  font-weight: bold;
-}
-
-/* Gauges container */
-.gauges {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 10px;
-}
-
-.gauge-box { width: 45%; }
-canvas { width: 100% !important; height: 160px !important; }
+body { font-family:'Segoe UI', sans-serif; background:#1f253d; color:#fff; text-align:center; margin:0; padding:10px;}
+h1{margin:10px;font-size:1.5em;}
+.status{font-weight:bold; margin-bottom:10px;}
+.card{background:#2c3246; border-radius:10px; padding:10px; margin:10px auto; max-width:500px;}
+.values{display:flex; justify-content:space-around; margin-bottom:10px;}
+.value span{display:block; font-size:1.4em; font-weight:bold;}
+.gauges{display:flex; justify-content:space-around; margin-top:10px;}
+.gauge-box{width:45%;}
+canvas{width:100% !important;height:160px !important;}
+.needle{position:absolute;width:2px;height:70px;background:white;transform-origin:bottom;top:20px;left:50%;margin-left:-1px;}
+.gauge-wrapper{position:relative;}
 </style>
 </head>
 <body>
 
-<h1>🌡️ DHT22 Dashboard with Needle Gauges</h1>
+<h1>🌡️ DHT22 Dashboard</h1>
 <div class="status">Status: <span id="status">Connecting...</span></div>
 
 <div class="card">
@@ -69,13 +34,17 @@ canvas { width: 100% !important; height: 160px !important; }
     <div class="value">Hum <span id="hum">--</span>%</div>
   </div>
 
-  <!-- Graph -->
   <canvas id="chart"></canvas>
 
-  <!-- Needle Gauges -->
   <div class="gauges">
-    <div class="gauge-box"><canvas id="gTemp"></canvas></div>
-    <div class="gauge-box"><canvas id="gHum"></canvas></div>
+    <div class="gauge-box gauge-wrapper">
+      <canvas id="gTemp"></canvas>
+      <div class="needle" id="nTemp"></div>
+    </div>
+    <div class="gauge-box gauge-wrapper">
+      <canvas id="gHum"></canvas>
+      <div class="needle" id="nHum"></div>
+    </div>
   </div>
 </div>
 
@@ -99,53 +68,46 @@ const client = mqtt.connect("wss://1956694161de4eb899ebb06b4935709e.s1.eu.hivemq
   password: "Catherine1"
 });
 
-client.on("connect", () => {
-  document.getElementById("status").innerText = "✅ Connected";
+client.on("connect", ()=>{
+  document.getElementById("status").innerText="✅ Connected";
   client.subscribe("esp32/dht22");
 });
 
 // ================= GRAPH =================
 const labels=[], tempData=[], humData=[];
 const chart = new Chart(document.getElementById("chart"), {
-  type: "line",
-  data: {
-    labels,
-    datasets: [
-      { label: "Temp (°C)", data: tempData, borderColor: "#e74c3c", backgroundColor: "rgba(231,76,60,0.2)", fill: true, yAxisID:"y1" },
-      { label: "Hum (%)", data: humData, borderColor: "#3498db", backgroundColor: "rgba(52,152,219,0.2)", fill: true, yAxisID:"y2" }
-    ]
-  },
-  options: {
-    responsive:true,
-    scales: {
-      y1: { min:0, max:50, ticks:{stepSize:10} },
-      y2: { position:"right", min:0, max:100, ticks:{stepSize:10} }
-    }
+  type:"line",
+  data:{ labels, datasets:[
+    {label:"Temp (°C)", data:tempData, borderColor:"#e74c3c", backgroundColor:"rgba(231,76,60,0.2)", fill:true, yAxisID:"y1"},
+    {label:"Hum (%)", data:humData, borderColor:"#3498db", backgroundColor:"rgba(52,152,219,0.2)", fill:true, yAxisID:"y2"}
+  ]},
+  options:{ responsive:true,
+    scales:{ y1:{min:0,max:50,ticks:{stepSize:10}}, y2:{position:"right",min:0,max:100,ticks:{stepSize:10}} }
   }
 });
 
-// ================= NEEDLE GAUGES =================
-function createNeedleGauge(id, min, max, color){
-  return new Chart(document.getElementById(id), {
-    type: 'gauge',
-    data: { datasets:[{ value: 0, minValue: min, data: [max], backgroundColor: [color] }] },
-    options:{
-      responsive:true,
-      needle: { radiusPercentage: 80, widthPercentage: 3, lengthPercentage: 90, color: 'rgba(255,255,255,0.9)' },
-      valueLabel: { display: true, formatter: v => v.toFixed(1) },
-      plugins: { legend: { display:false } }
-    }
+// ================= SIMPLE NEEDLE GAUGES =================
+function createGauge(ctx, max){
+  return new Chart(ctx,{
+    type:"doughnut",
+    data:{datasets:[{data:[0,max], backgroundColor:["#e74c3c","#444"]}]},
+    options:{rotation:-90, circumference:180, cutout:"70%", plugins:{legend:{display:false}}}
   });
 }
 
-const gTemp = createNeedleGauge("gTemp", 0, 50, "#e74c3c");
-const gHum = createNeedleGauge("gHum", 0, 100, "#3498db");
+const gTemp = createGauge(document.getElementById("gTemp"),50);
+const gHum  = createGauge(document.getElementById("gHum"),100);
+
+function updateNeedle(needleId,value,max){
+  const angle = (value/max)*180 - 90;
+  document.getElementById(needleId).style.transform = `rotate(${angle}deg)`;
+}
 
 // ================= DATA FLOW =================
-client.on("message", (topic, msg)=>{
+client.on("message",(topic,msg)=>{
   const data = JSON.parse(msg.toString());
   const temp = data.temp;
-  const hum = data.hum;
+  const hum  = data.hum;
 
   // Update text
   document.getElementById("temp").innerText = temp.toFixed(1);
@@ -158,10 +120,13 @@ client.on("message", (topic, msg)=>{
   chart.update();
 
   // Update gauges
-  gTemp.data.datasets[0].value = temp;
-  gHum.data.datasets[0].value = hum;
+  gTemp.data.datasets[0].data=[temp,50-temp];
+  gHum.data.datasets[0].data=[hum,100-hum];
   gTemp.update();
   gHum.update();
+
+  updateNeedle("nTemp",temp,50);
+  updateNeedle("nHum",hum,100);
 
   // Firebase
   db.ref("node1/latest").set({ temp, hum, time: Date.now() });
