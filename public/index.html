@@ -22,17 +22,26 @@ body {
   color: #fff;
   text-align: center;
 }
-
 h1 { padding: 15px; margin: 0; }
 .status { margin-bottom: 10px; font-weight: bold; }
+
+.container {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
 
 .card {
   background: #2c3246;
   border-radius: 10px;
-  padding: 12px;
-  margin: 15px auto;
+  padding: 15px;
+  width: 320px;
   box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-  max-width: 900px;
+}
+
+.card h3 {
+  margin: 0 0 10px 0;
 }
 
 .values {
@@ -47,54 +56,34 @@ h1 { padding: 15px; margin: 0; }
   font-weight: bold;
 }
 
-/* Graph containers */
-.graphs {
-  display: flex;
-  justify-content: space-around;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-
-canvas {
-  background: #2c3246;
-  border-radius: 10px;
-  padding: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-/* Water level vertical bar */
-.water-container {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  height: 250px;
-  margin-top: 20px;
-}
-
-.water-bar {
+/* Water level bar */
+.water-bar-container {
   position: relative;
-  width: 60px;
-  height: 100%;
-  background: #444;
-  border-radius: 8px;
-  margin: 0 20px;
+  height: 200px;
+  width: 50px;
+  margin: 10px auto;
+  border: 2px solid #555;
+  border-radius: 5px;
+  background: #333;
   overflow: hidden;
 }
 
-.water-fill {
+.water-bar {
   position: absolute;
   bottom: 0;
   width: 100%;
-  height: 0%;
+  height: 0;
   transition: height 0.5s ease;
 }
 
 .water-labels {
   display: flex;
-  flex-direction: column;
   justify-content: space-between;
-  margin-left: 10px;
-  height: 250px;
+  flex-direction: column;
+  height: 200px;
+  position: absolute;
+  left: 55px;
+  top: 0;
 }
 
 .water-labels span {
@@ -107,36 +96,27 @@ canvas {
 <h1>🌾 AWD Monitoring Dashboard</h1>
 <div class="status">Status: <span id="status">Connecting...</span></div>
 
-<div class="card">
-  <h3>Node 1</h3>
-  <div class="values">
-    <div class="value">Temp <span id="temp">-- °C</span></div>
-    <div class="value">Hum <span id="hum">-- %</span></div>
-  </div>
+<div class="container">
+  <div class="card">
+    <h3>Node 1</h3>
 
-  <div class="graphs">
-    <canvas id="tempChart" width="400" height="200"></canvas>
-    <canvas id="humChart" width="400" height="200"></canvas>
-  </div>
-
-  <div class="water-container">
-    <div class="water-bar">
-      <div id="waterFill" class="water-fill"></div>
+    <div class="values">
+      <div class="value">Temp <span id="temp">--</span>°C</div>
+      <div class="value">Hum <span id="hum">--</span>%</div>
     </div>
-    <div class="water-labels">
-      <span>60 cm</span>
-      <span>50 cm</span>
-      <span>40 cm</span>
-      <span>30 cm</span>
-      <span>20 cm</span>
-      <span>10 cm</span>
-      <span>0 cm</span>
+
+    <canvas id="chart"></canvas>
+
+    <h4>Water Level</h4>
+    <div class="water-bar-container">
+      <div id="waterBar" class="water-bar"></div>
+      <div class="water-labels" id="waterLabels"></div>
     </div>
   </div>
 </div>
 
 <script>
-// ================= FIREBASE =================
+// ====== FIREBASE CONFIG ======
 const firebaseConfig = {
   apiKey: "AIzaSyCvoSR-oFO_W-1iyiY5Y7PqBoA94HB9Fuo",
   authDomain: "databaseawd.firebaseapp.com",
@@ -150,80 +130,93 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ================= MQTT =================
-const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+// ====== MQTT ======
+const client = mqtt.connect("wss://1956694161de4eb899ebb06b4935709e.s1.eu.hivemq.cloud:8884/mqtt", {
+  username: "catherine",
+  password: "Catherine1"
+});
+
 client.on("connect", ()=>{
   document.getElementById("status").innerText="✅ Connected";
   client.subscribe("esp32/dht22");
 });
 
-// ================= GRAPH DATA =================
-const tempLabels=[], tempData=[];
-const humLabels=[], humData=[];
-
-// Temp Chart
-const tempChart = new Chart(document.getElementById("tempChart"), {
+// ====== GRAPH ======
+const labels=[], tempData=[], humData=[];
+const chart = new Chart(document.getElementById("chart"),{
   type:"line",
-  data:{ labels: tempLabels, datasets:[{
-    label:"Temperature (°C)",
-    data: tempData,
-    borderColor:"#e74c3c",
-    backgroundColor:"rgba(231,76,60,0.2)",
-    tension:0.3,
-    fill:true
-  }]},
-  options:{ scales:{ y:{ min:0, max:50, ticks:{ stepSize:10 } } } }
+  data:{
+    labels,
+    datasets:[
+      {label:"Temp (°C)", data:tempData, borderColor:"#e74c3c", fill:true, yAxisID:"y1"},
+      {label:"Hum (%)", data:humData, borderColor:"#3498db", fill:true, yAxisID:"y2"}
+    ]
+  },
+  options:{
+    responsive:true,
+    animation:{duration:500},
+    scales:{
+      y1:{min:0,max:50,ticks:{stepSize:10}},
+      y2:{position:"right",min:0,max:100,ticks:{stepSize:10}}
+    }
+  }
 });
 
-// Hum Chart
-const humChart = new Chart(document.getElementById("humChart"), {
-  type:"line",
-  data:{ labels: humLabels, datasets:[{
-    label:"Humidity (%)",
-    data: humData,
-    borderColor:"#3498db",
-    backgroundColor:"rgba(52,152,219,0.2)",
-    tension:0.3,
-    fill:true
-  }]},
-  options:{ scales:{ y:{ min:0, max:100, ticks:{ stepSize:10 } } } }
-});
+// ====== WATER BAR ======
+const waterBar = document.getElementById("waterBar");
+const waterLabels = document.getElementById("waterLabels");
+const MAX_WATER = 60; // cm (2 ft)
+for(let i=0;i<=MAX_WATER;i+=10){
+  const span = document.createElement("span");
+  span.innerText = i;
+  waterLabels.prepend(span);
+}
 
-// ================= DATA FLOW =================
+function updateWaterBar(value){
+  const percent = Math.min(Math.max(value,0)/MAX_WATER,1);
+  waterBar.style.height = (percent*100)+"%";
+
+  // color zones
+  if(percent<0.5) waterBar.style.backgroundColor="#2ecc71"; // green
+  else if(percent<0.8) waterBar.style.backgroundColor="#f1c40f"; // yellow
+  else waterBar.style.backgroundColor="#e74c3c"; // red
+}
+
+// ====== DATA FLOW ======
 client.on("message",(topic,msg)=>{
-  const data = JSON.parse(msg.toString());
-  const temp = data.temp || 0;
-  const hum = data.hum || 0;
-  const water = data.water || 0;
+  try{
+    const data=JSON.parse(msg.toString());
+    const temp=data.temp;
+    const hum=data.hum;
+    const water=data.water;
 
-  // Update UI
-  document.getElementById("temp").innerText=temp.toFixed(1)+" °C";
-  document.getElementById("hum").innerText=hum.toFixed(1)+" %";
+    document.getElementById("temp").innerText=temp.toFixed(1);
+    document.getElementById("hum").innerText=hum.toFixed(1);
 
-  // Graph
-  const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-  tempLabels.push(time); tempData.push(temp);
-  humLabels.push(time); humData.push(hum);
-  if(tempLabels.length>7){ tempLabels.shift(); tempData.shift(); humLabels.shift(); humData.shift(); }
+    // update graph
+    const t=new Date();
+    const timeLabel = t.getHours()+":"+("0"+t.getMinutes()).slice(-2);
+    labels.push(timeLabel);
+    tempData.push(temp);
+    humData.push(hum);
 
-  tempChart.update();
-  humChart.update();
+    if(labels.length>7){
+      labels.shift();
+      tempData.shift();
+      humData.shift();
+    }
+    chart.update();
 
-  // Water level bar with gradient
-  const maxLevel = 60; // 60 cm
-  const percent = Math.min((water/maxLevel)*100,100);
-  const bar = document.getElementById("waterFill");
+    // update water bar
+    updateWaterBar(water);
 
-  let color = "#2ecc71"; // green
-  if(water>45) color="#e74c3c"; // red
-  else if(water>30) color="#f1c40f"; // yellow
+    // ====== SAVE TO FIREBASE ======
+    db.ref("node1/latest").set({temp, hum, time: Date.now()});
+    db.ref("node1/history").push({temp, hum, time: timeLabel});
 
-  bar.style.height = percent+"%";
-  bar.style.background = color;
-
-  // ================= SAVE TO FIREBASE =================
-  db.ref("node1/latest").set({ temp, hum, water, time: Date.now() });
-  db.ref("node1/history").push({ temp, hum, water, time: new Date().toLocaleString() });
+  } catch(e){
+    console.error("Invalid MQTT message:", msg.toString());
+  }
 });
 </script>
 </body>
