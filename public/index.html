@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>DHT22 Dashboard</title>
+<title>AWD Monitoring Dashboard</title>
 
 <!-- MQTT -->
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -15,98 +15,216 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <style>
-body { font-family:'Segoe UI', sans-serif; background:#1f253d; color:#fff; text-align:center; margin:0; padding:10px;}
-h1{margin:10px;font-size:1.5em;}
-.status{font-weight:bold; margin-bottom:10px;}
-.card{background:#2c3246; border-radius:10px; padding:10px; margin:10px auto; max-width:500px;}
-.values{display:flex; justify-content:space-around; margin-bottom:10px;}
-.value span{display:block; font-size:1.4em; font-weight:bold;}
-canvas{width:100% !important;height:200px !important;}
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: #1f253d;
+  color: #fff;
+  text-align: center;
+}
+
+h1 { padding: 15px; margin: 0; }
+.status { margin-bottom: 10px; font-weight: bold; }
+
+.card {
+  background: #2c3246;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 15px auto;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  max-width: 900px;
+}
+
+.values {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 10px;
+}
+
+.value span {
+  display: block;
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+/* Graph containers */
+.graphs {
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+canvas {
+  background: #2c3246;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* Water level vertical bar */
+.water-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 250px;
+  margin-top: 20px;
+}
+
+.water-bar {
+  position: relative;
+  width: 60px;
+  height: 100%;
+  background: #444;
+  border-radius: 8px;
+  margin: 0 20px;
+  overflow: hidden;
+}
+
+.water-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0%;
+  transition: height 0.5s ease;
+}
+
+.water-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin-left: 10px;
+  height: 250px;
+}
+
+.water-labels span {
+  font-size: 0.8em;
+}
 </style>
 </head>
 <body>
 
-<h1>🌡️ DHT22 Dashboard</h1>
+<h1>🌾 AWD Monitoring Dashboard</h1>
 <div class="status">Status: <span id="status">Connecting...</span></div>
 
 <div class="card">
+  <h3>Node 1</h3>
   <div class="values">
-    <div class="value">Temp <span id="temp">--</span>°C</div>
-    <div class="value">Hum <span id="hum">--</span>%</div>
+    <div class="value">Temp <span id="temp">-- °C</span></div>
+    <div class="value">Hum <span id="hum">-- %</span></div>
   </div>
 
-  <canvas id="chart"></canvas>
+  <div class="graphs">
+    <canvas id="tempChart" width="400" height="200"></canvas>
+    <canvas id="humChart" width="400" height="200"></canvas>
+  </div>
+
+  <div class="water-container">
+    <div class="water-bar">
+      <div id="waterFill" class="water-fill"></div>
+    </div>
+    <div class="water-labels">
+      <span>60 cm</span>
+      <span>50 cm</span>
+      <span>40 cm</span>
+      <span>30 cm</span>
+      <span>20 cm</span>
+      <span>10 cm</span>
+      <span>0 cm</span>
+    </div>
+  </div>
 </div>
 
 <script>
 // ================= FIREBASE =================
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCvoSR-oFO_W-1iyiY5Y7PqBoA94HB9Fuo",
+  authDomain: "databaseawd.firebaseapp.com",
+  databaseURL: "https://databaseawd-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "databaseawd",
+  storageBucket: "databaseawd.firebasestorage.app",
+  messagingSenderId: "261523660331",
+  appId: "1:261523660331:web:6225e6bb71b5555c31546e",
+  measurementId: "G-95ZLFJ4649"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // ================= MQTT =================
-const client = mqtt.connect("wss://1956694161de4eb899ebb06b4935709e.s1.eu.hivemq.cloud:8884/mqtt", {
-  username: "catherine",
-  password: "Catherine1"
-});
-
+const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
 client.on("connect", ()=>{
   document.getElementById("status").innerText="✅ Connected";
   client.subscribe("esp32/dht22");
 });
 
-// ================= GRAPH =================
-const labels=[], tempData=[], humData=[];
-const chart = new Chart(document.getElementById("chart"), {
+// ================= GRAPH DATA =================
+const tempLabels=[], tempData=[];
+const humLabels=[], humData=[];
+
+// Temp Chart
+const tempChart = new Chart(document.getElementById("tempChart"), {
   type:"line",
-  data:{ labels, datasets:[
-    {label:"Temp (°C)", data:tempData, borderColor:"#e74c3c", backgroundColor:"rgba(231,76,60,0.2)", fill:true, yAxisID:"y1"},
-    {label:"Hum (%)", data:humData, borderColor:"#3498db", backgroundColor:"rgba(52,152,219,0.2)", fill:true, yAxisID:"y2"}
-  ]},
-  options:{ responsive:true,
-    scales:{ 
-      y1:{min:0,max:50,ticks:{stepSize:10}},
-      y2:{position:"right",min:0,max:100,ticks:{stepSize:10}}
-    }
-  }
+  data:{ labels: tempLabels, datasets:[{
+    label:"Temperature (°C)",
+    data: tempData,
+    borderColor:"#e74c3c",
+    backgroundColor:"rgba(231,76,60,0.2)",
+    tension:0.3,
+    fill:true
+  }]},
+  options:{ scales:{ y:{ min:0, max:50, ticks:{ stepSize:10 } } } }
+});
+
+// Hum Chart
+const humChart = new Chart(document.getElementById("humChart"), {
+  type:"line",
+  data:{ labels: humLabels, datasets:[{
+    label:"Humidity (%)",
+    data: humData,
+    borderColor:"#3498db",
+    backgroundColor:"rgba(52,152,219,0.2)",
+    tension:0.3,
+    fill:true
+  }]},
+  options:{ scales:{ y:{ min:0, max:100, ticks:{ stepSize:10 } } } }
 });
 
 // ================= DATA FLOW =================
 client.on("message",(topic,msg)=>{
   const data = JSON.parse(msg.toString());
   const temp = data.temp || 0;
-  const hum  = data.hum || 0;
+  const hum = data.hum || 0;
+  const water = data.water || 0;
 
-  // Update text
-  document.getElementById("temp").innerText = temp.toFixed(1);
-  document.getElementById("hum").innerText = hum.toFixed(1);
+  // Update UI
+  document.getElementById("temp").innerText=temp.toFixed(1)+" °C";
+  document.getElementById("hum").innerText=hum.toFixed(1)+" %";
 
-  // Format time as HH:MM (24-hour)
-  const now = new Date();
-  const hours = now.getHours().toString().padStart(2,'0');
-  const minutes = now.getMinutes().toString().padStart(2,'0');
-  const timeLabel = `${hours}:${minutes}`;
+  // Graph
+  const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  tempLabels.push(time); tempData.push(temp);
+  humLabels.push(time); humData.push(hum);
+  if(tempLabels.length>7){ tempLabels.shift(); tempData.shift(); humLabels.shift(); humData.shift(); }
 
-  labels.push(timeLabel);
-  tempData.push(temp);
-  humData.push(hum);
+  tempChart.update();
+  humChart.update();
 
-  if(labels.length>7){ labels.shift(); tempData.shift(); humData.shift(); }
-  chart.update();
+  // Water level bar with gradient
+  const maxLevel = 60; // 60 cm
+  const percent = Math.min((water/maxLevel)*100,100);
+  const bar = document.getElementById("waterFill");
 
-  // Firebase
-  db.ref("node1/latest").set({ temp, hum, time: Date.now() });
-  db.ref("node1/history").push({ temp, hum, time: now.toLocaleString() });
+  let color = "#2ecc71"; // green
+  if(water>45) color="#e74c3c"; // red
+  else if(water>30) color="#f1c40f"; // yellow
+
+  bar.style.height = percent+"%";
+  bar.style.background = color;
+
+  // ================= SAVE TO FIREBASE =================
+  db.ref("node1/latest").set({ temp, hum, water, time: Date.now() });
+  db.ref("node1/history").push({ temp, hum, water, time: new Date().toLocaleString() });
 });
 </script>
-
 </body>
 </html>
