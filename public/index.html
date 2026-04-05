@@ -1,231 +1,591 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>AWD Monitoring Dashboard</title>
+  <meta charset="UTF-8" />
+  <title>AWD Monitoring Dashboard</title>
 
-<!-- MQTT -->
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <!-- MQTT -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-<style>
-body {
-  margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: #1f253d;
-  color: #fff;
-}
+  <style>
+    :root {
+      --bg-main: #151a2b;
+      --bg-card: #1f2538;
+      --accent: #3498db;
+      --accent-danger: #e74c3c;
+      --accent-warning: #f1c40f;
+      --accent-success: #2ecc71;
+      --text-main: #f5f7ff;
+      --text-muted: #a5afc4;
+      --border-subtle: rgba(255, 255, 255, 0.04);
+      --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.5);
+    }
 
-h1 { text-align: center; padding: 15px; margin:0; }
-.status { text-align: center; margin-bottom: 10px; font-weight: bold; }
+    * {
+      box-sizing: border-box;
+    }
 
-.container {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at top left, #283046 0, var(--bg-main) 55%);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+    }
 
-.card {
-  background: #2c3246;
-  border-radius: 10px;
-  padding: 15px;
-  display: flex;
-  gap: 20px;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-}
+    header {
+      width: 100%;
+      max-width: 1100px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
 
-.left-panel {
-  flex: 2;
-}
+    .title-block {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
-.right-panel {
-  flex: 0 0 50px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-}
+    .title-pill {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), #8e44ad);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      box-shadow: 0 0 14px rgba(52, 152, 219, 0.6);
+    }
 
-.values {
-  display: flex;
-  justify-content: space-around;
-  margin-bottom: 10px;
-}
+    h1 {
+      font-size: 1.6rem;
+      margin: 0;
+      letter-spacing: 0.04em;
+    }
 
-.value span {
-  display: block;
-  font-size: 1.2em;
-  font-weight: bold;
-}
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
 
-/* Water bar */
-.water-bar-container {
-  position: relative;
-  width: 25px;
-  height: 300px; /* same height as chart */
-  background: #333;
-  border-radius: 5px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column-reverse;
-}
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(31, 37, 61, 0.9);
+      border: 1px solid var(--border-subtle);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
 
-.water-bar {
-  width: 100%;
-  height: 0%;
-  transition: height 0.5s ease;
-}
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #f39c12;
+      box-shadow: 0 0 8px rgba(243, 156, 18, 0.7);
+    }
 
-.water-labels {
-  position: absolute;
-  left: 30px;
-  top: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column-reverse;
-  justify-content: space-between;
-  font-size: 0.8em;
-  color: #fff;
-}
-</style>
+    .status.connected .status-dot {
+      background: #2ecc71;
+      box-shadow: 0 0 10px rgba(46, 204, 113, 0.9);
+    }
+
+    .status-label {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .status-value {
+      font-weight: 500;
+    }
+
+    .layout {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      flex: 1 1 380px;
+      display: flex;
+      gap: 18px;
+      padding: 18px 20px 20px;
+      background: linear-gradient(145deg, var(--bg-card), #161b2a);
+      border-radius: 14px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid var(--border-subtle);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+      border-color: rgba(52, 152, 219, 0.35);
+    }
+
+    .left-panel {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .node-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .node-header h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #ecf0f1;
+    }
+
+    .node-tag {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(52, 152, 219, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(52, 152, 219, 0.4);
+    }
+
+    .values {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .value {
+      background: radial-gradient(circle at top left, #283045, #181d2c);
+      border-radius: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .value-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.7rem;
+    }
+
+    .value span {
+      font-size: 1.2em;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .unit {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-left: 3px;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      margin-top: 8px;
+    }
+
+    #chart {
+      width: 100%;
+      height: 300px;
+    }
+
+    .right-panel {
+      flex: 0 0 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .water-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .water-caption-vertical {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+    }
+
+    .water-bar-container {
+      position: relative;
+      width: 32px;
+      height: 260px;
+      background: radial-gradient(circle at top, #333b56, #121624);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 18px rgba(41, 128, 185, 0.35);
+      display: flex;
+      flex-direction: column-reverse;
+    }
+
+    .water-bar {
+      width: 100%;
+      height: 0%;
+      transition: height 0.5s ease, background-color 0.2s ease;
+      background: var(--accent-success);
+      box-shadow: 0 0 16px rgba(46, 204, 113, 0.7);
+    }
+
+    .water-labels {
+      position: absolute;
+      left: 40px;
+      top: 4px;
+      bottom: 4px;
+      display: flex;
+      flex-direction: column-reverse;
+      justify-content: space-between;
+      font-size: 0.78em;
+      color: var(--text-muted);
+    }
+
+    .water-ticks {
+      position: absolute;
+      inset: 6px 0 6px 0;
+      display: flex;
+      flex-direction: column-reverse;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.8);
+      text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 18px 10px 28px;
+      }
+
+      header {
+        margin-bottom: 12px;
+      }
+
+      .card {
+        padding: 14px 14px 16px;
+      }
+
+      .right-panel {
+        flex-direction: row;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .water-labels {
+        left: 36px;
+        font-size: 0.7rem;
+      }
+    }
+  </style>
 </head>
 <body>
-
-<h1>🌾 AWD Monitoring Dashboard</h1>
-<div class="status">Status: <span id="status">Connecting...</span></div>
-
-<div class="container">
-  <div class="card">
-    <div class="left-panel">
-      <h3>Node 1</h3>
-      <div class="values">
-        <div class="value">Temp <span id="temp">--</span>°C</div>
-        <div class="value">Hum <span id="hum">--</span>%</div>
-        <div class="value">Water <span id="water">--</span> cm</div>
+  <header>
+    <div class="title-block">
+      <div class="title-pill">A</div>
+      <div>
+        <h1>AWD Monitoring Dashboard</h1>
+        <p class="subtitle">Real-time telemetry from Node 1</p>
       </div>
-      <canvas id="chart" height="300"></canvas>
     </div>
 
-    <div class="right-panel">
-      <div class="water-bar-container">
-        <div id="waterBar" class="water-bar"></div>
-        <div class="water-labels" id="waterLabels"></div>
-      </div>
-      <div style="margin-top:5px; font-size:0.9em;">Water Level</div>
+    <div id="statusWrapper" class="status">
+      <span class="status-dot"></span>
+      <span class="status-label">Status:</span>
+      <span id="status" class="status-value">Connecting...</span>
     </div>
-  </div>
-</div>
+  </header>
 
-<script>
-// ===== FIREBASE =====
-const firebaseConfig = {
-  apiKey: "AIzaSyCvoSR-oFO_W-1iyiY5Y7PqBoA94HB9Fuo",
-  authDomain: "databaseawd.firebaseapp.com",
-  databaseURL: "https://databaseawd-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "databaseawd",
-  storageBucket: "databaseawd.firebasestorage.app",
-  messagingSenderId: "261523660331",
-  appId: "1:261523660331:web:6225e6bb71b5555c31546e",
-  measurementId: "G-95ZLFJ4649"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+  <main class="layout">
+    <section class="card">
+      <div class="left-panel">
+        <div class="node-header">
+          <h3>Node 1</h3>
+          <span class="node-tag">LIVE</span>
+        </div>
 
-// ===== MQTT =====
-const client = mqtt.connect("wss://1956694161de4eb899ebb06b4935709e.s1.eu.hivemq.cloud:8884/mqtt", {
-  username: "catherine",
-  password: "Catherine1"
-});
+        <div class="values">
+          <div class="value">
+            <span class="value-label">Temp</span>
+            <div>
+              <span id="temp">--</span><span class="unit">°C</span>
+            </div>
+          </div>
 
-client.on("connect", ()=>{
-  document.getElementById("status").innerText="✅ Connected";
-  client.subscribe("esp32/dht22");
-});
+          <div class="value">
+            <span class="value-label">Hum</span>
+            <div>
+              <span id="hum">--</span><span class="unit">%</span>
+            </div>
+          </div>
 
-// ===== GRAPH =====
-const labels=[], tempData=[], humData=[];
-const chart = new Chart(document.getElementById("chart"),{
-  type:"line",
-  data:{
-    labels,
-    datasets:[
-      {label:"Temp (°C)", data:tempData, borderColor:"#e74c3c", fill:true, yAxisID:"y1"},
-      {label:"Hum (%)", data:humData, borderColor:"#3498db", fill:true, yAxisID:"y2"}
-    ]
-  },
-  options:{
-    responsive:true,
-    animation:{duration:500},
-    scales:{
-      y1:{min:0,max:50,ticks:{stepSize:10}},
-      y2:{position:"right",min:0,max:100,ticks:{stepSize:10}}
+          <div class="value">
+            <span class="value-label">Water</span>
+            <div>
+              <span id="water">--</span><span class="unit">cm</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-wrapper">
+          <canvas id="chart" height="300"></canvas>
+        </div>
+      </div>
+
+      <aside class="right-panel">
+        <div class="water-wrapper">
+          <div class="water-caption-vertical">Water Level</div>
+          <div class="water-bar-container">
+            <div id="waterBar" class="water-bar"></div>
+            <div class="water-ticks" id="waterTicks"></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    // ===== FIREBASE =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyCvoSR-oFO_W-1iyiY5Y7PqBoA94HB9Fuo",
+      authDomain: "databaseawd.firebaseapp.com",
+      databaseURL: "https://databaseawd-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "databaseawd",
+      storageBucket: "databaseawd.firebasestorage.app",
+      messagingSenderId: "261523660331",
+      appId: "1:261523660331:web:6225e6bb71b5555c31546e",
+      measurementId: "G-95ZLFJ4649"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ===== MQTT =====
+    const client = mqtt.connect(
+      "wss://1956694161de4eb899ebb06b4935709e.s1.eu.hivemq.cloud:8884/mqtt",
+      {
+        username: "catherine",
+        password: "Catherine1"
+      }
+    );
+
+    const statusEl = document.getElementById("status");
+    const statusWrapper = document.getElementById("statusWrapper");
+
+    client.on("connect", () => {
+      statusEl.innerText = "Connected";
+      statusWrapper.classList.add("connected");
+      client.subscribe("esp32/dht22");
+    });
+
+    client.on("close", () => {
+      statusEl.innerText = "Disconnected";
+      statusWrapper.classList.remove("connected");
+    });
+
+    client.on("error", () => {
+      statusEl.innerText = "Error";
+      statusWrapper.classList.remove("connected");
+    });
+
+    // ===== GRAPH =====
+    const labels = [];
+    const tempData = [];
+    const humData = [];
+
+    const chart = new Chart(document.getElementById("chart"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Temp (°C)",
+            data: tempData,
+            borderColor: "rgba(231, 76, 60, 1)",
+            backgroundColor: "rgba(231, 76, 60, 0.15)",
+            fill: true,
+            borderWidth: 2,
+            tension: 0.35,
+            pointRadius: 2.5,
+            yAxisID: "y1"
+          },
+          {
+            label: "Hum (%)",
+            data: humData,
+            borderColor: "rgba(52, 152, 219, 1)",
+            backgroundColor: "rgba(52, 152, 219, 0.18)",
+            fill: true,
+            borderWidth: 2,
+            tension: 0.35,
+            pointRadius: 2.5,
+            yAxisID: "y2"
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 500 },
+        plugins: {
+          legend: {
+            labels: {
+              color: "#ecf0f1",
+              font: { size: 11 }
+            }
+          },
+          tooltip: {
+            backgroundColor: "rgba(15, 20, 35, 0.9)",
+            borderColor: "rgba(255, 255, 255, 0.08)",
+            borderWidth: 1,
+            titleColor: "#ffffff",
+            bodyColor: "#ecf0f1"
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: "#a5afc4",
+              font: { size: 10 }
+            },
+            grid: {
+              color: "rgba(255, 255, 255, 0.04)"
+            }
+          },
+          y1: {
+            position: "left",
+            min: 0,
+            max: 50,
+            ticks: {
+              stepSize: 10,
+              color: "#a5afc4",
+              font: { size: 10 }
+            },
+            grid: {
+              color: "rgba(255, 255, 255, 0.04)"
+            }
+          },
+          y2: {
+            position: "right",
+            min: 0,
+            max: 100,
+            ticks: {
+              stepSize: 10,
+              color: "#a5afc4",
+              font: { size: 10 }
+            },
+            grid: {
+              drawOnChartArea: false
+            }
+          }
+        }
+      }
+    });
+
+    // ===== WATER BAR =====
+    const waterBar = document.getElementById("waterBar");
+    const waterTicks = document.getElementById("waterTicks");
+    const MAX_WATER = 60; // cm
+
+    for (let i = 0; i <= MAX_WATER; i += 10) {
+      const tick = document.createElement("span");
+      tick.innerText = i + " cm";
+      waterTicks.appendChild(tick);
     }
-  }
-});
 
-// ===== WATER BAR =====
-const waterBar = document.getElementById("waterBar");
-const waterLabels = document.getElementById("waterLabels");
-const MAX_WATER = 60; // cm
+    function updateWaterBar(value) {
+      const percent = Math.min(Math.max(value, 0) / MAX_WATER, 1);
+      waterBar.style.height = percent * 100 + "%";
 
-// Add labels
-for(let i=0;i<=MAX_WATER;i+=10){
-  const span = document.createElement("span");
-  span.innerText = i;
-  waterLabels.appendChild(span);
-}
-
-function updateWaterBar(value){
-  const percent = Math.min(Math.max(value,0)/MAX_WATER,1);
-  waterBar.style.height = (percent*100)+"%";
-
-  if(percent<0.5) waterBar.style.backgroundColor="#2ecc71"; // green
-  else if(percent<0.8) waterBar.style.backgroundColor="#f1c40f"; // yellow
-  else waterBar.style.backgroundColor="#e74c3c"; // red
-}
-
-// ===== DATA FLOW =====
-client.on("message",(topic,msg)=>{
-  try{
-    const data=JSON.parse(msg.toString());
-    const temp=data.temp;
-    const hum=data.hum;
-    const water=data.water;
-
-    document.getElementById("temp").innerText=temp.toFixed(1);
-    document.getElementById("hum").innerText=hum.toFixed(1);
-    document.getElementById("water").innerText=water.toFixed(1);
-
-    const t=new Date();
-    const timeLabel = t.getHours()+":"+("0"+t.getMinutes()).slice(-2);
-    labels.push(timeLabel);
-    tempData.push(temp);
-    humData.push(hum);
-
-    if(labels.length>7){
-      labels.shift();
-      tempData.shift();
-      humData.shift();
+      if (percent < 0.5) {
+        waterBar.style.backgroundColor = "var(--accent-success)";
+        waterBar.style.boxShadow = "0 0 16px rgba(46, 204, 113, 0.7)";
+      } else if (percent < 0.8) {
+        waterBar.style.backgroundColor = "var(--accent-warning)";
+        waterBar.style.boxShadow = "0 0 16px rgba(241, 196, 15, 0.7)";
+      } else {
+        waterBar.style.backgroundColor = "var(--accent-danger)";
+        waterBar.style.boxShadow = "0 0 16px rgba(231, 76, 60, 0.8)";
+      }
     }
-    chart.update();
 
-    updateWaterBar(water);
+    // ===== DATA FLOW =====
+    client.on("message", (topic, msg) => {
+      try {
+        const data = JSON.parse(msg.toString());
+        const temp = data.temp;
+        const hum = data.hum;
+        const water = data.water;
 
-    db.ref("node1/latest").set({temp, hum, water, time: Date.now()});
-    db.ref("node1/history").push({temp, hum, water, time: timeLabel});
+        document.getElementById("temp").innerText = temp.toFixed(1);
+        document.getElementById("hum").innerText = hum.toFixed(1);
+        document.getElementById("water").innerText = water.toFixed(1);
 
-  } catch(e){
-    console.error("Invalid MQTT message:", msg.toString());
-  }
-});
-</script>
+        const t = new Date();
+        const timeLabel =
+          t.getHours() + ":" + ("0" + t.getMinutes()).slice(-2);
 
+        labels.push(timeLabel);
+        tempData.push(temp);
+        humData.push(hum);
+
+        if (labels.length > 7) {
+          labels.shift();
+          tempData.shift();
+          humData.shift();
+        }
+        chart.update();
+
+        updateWaterBar(water);
+
+        db.ref("node1/latest").set({ temp, hum, water, time: Date.now() });
+        db.ref("node1/history").push({ temp, hum, water, time: timeLabel });
+      } catch (e) {
+        console.error("Invalid MQTT message:", msg.toString());
+      }
+    });
+  </script>
 </body>
 </html>
