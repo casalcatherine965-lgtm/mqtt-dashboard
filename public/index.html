@@ -2,31 +2,65 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>DHT22 Dashboard with Firebase</title>
+<title>DHT22 Dashboard with Needle Gauges</title>
 
 <!-- MQTT -->
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js Gauge Plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-gauge"></script>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <style>
-body { font-family:'Segoe UI'; background:#1f253d; color:#fff; text-align:center; }
-h1 { margin:10px; }
-.status { font-weight:bold; margin-bottom:10px; }
-.card { background:#2c3246; border-radius:10px; padding:15px; margin:10px; }
-.values { display:flex; justify-content:space-around; margin-bottom:10px; }
-.value span { display:block; font-size:1.4em; font-weight:bold; }
-.gauges { display:flex; justify-content:space-around; margin-top:10px; }
-canvas { width:100% !important; height:150px !important; }
-.gauge-box { width:45%; }
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #1f253d;
+  color: #fff;
+  text-align: center;
+  margin: 0;
+  padding: 10px;
+}
+
+h1 { margin: 10px; font-size: 1.5em; }
+.status { font-weight: bold; margin-bottom: 10px; }
+
+.card {
+  background: #2c3246;
+  border-radius: 10px;
+  padding: 10px;
+  margin: 10px auto;
+  max-width: 500px;
+}
+
+.values {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 10px;
+}
+
+.value span {
+  display: block;
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+/* Gauges container */
+.gauges {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 10px;
+}
+
+.gauge-box { width: 45%; }
+canvas { width: 100% !important; height: 160px !important; }
 </style>
 </head>
 <body>
 
-<h1>🌡️ DHT22 Dashboard with Firebase</h1>
+<h1>🌡️ DHT22 Dashboard with Needle Gauges</h1>
 <div class="status">Status: <span id="status">Connecting...</span></div>
 
 <div class="card">
@@ -38,7 +72,7 @@ canvas { width:100% !important; height:150px !important; }
   <!-- Graph -->
   <canvas id="chart"></canvas>
 
-  <!-- Gauges -->
+  <!-- Needle Gauges -->
   <div class="gauges">
     <div class="gauge-box"><canvas id="gTemp"></canvas></div>
     <div class="gauge-box"><canvas id="gHum"></canvas></div>
@@ -56,7 +90,6 @@ const firebaseConfig = {
   messagingSenderId: "YOUR_SENDER_ID",
   appId: "YOUR_APP_ID"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -66,68 +99,73 @@ const client = mqtt.connect("wss://1956694161de4eb899ebb06b4935709e.s1.eu.hivemq
   password: "Catherine1"
 });
 
-client.on("connect", ()=>{
-  document.getElementById("status").innerText="✅ Connected";
+client.on("connect", () => {
+  document.getElementById("status").innerText = "✅ Connected";
   client.subscribe("esp32/dht22");
 });
 
 // ================= GRAPH =================
 const labels=[], tempData=[], humData=[];
 const chart = new Chart(document.getElementById("chart"), {
-  type:"line",
-  data:{
+  type: "line",
+  data: {
     labels,
-    datasets:[
-      {label:"Temp (°C)", data:tempData, borderColor:"#e74c3c", backgroundColor:"rgba(231,76,60,0.2)", fill:true, yAxisID:"y1"},
-      {label:"Hum (%)", data:humData, borderColor:"#3498db", backgroundColor:"rgba(52,152,219,0.2)", fill:true, yAxisID:"y2"}
+    datasets: [
+      { label: "Temp (°C)", data: tempData, borderColor: "#e74c3c", backgroundColor: "rgba(231,76,60,0.2)", fill: true, yAxisID:"y1" },
+      { label: "Hum (%)", data: humData, borderColor: "#3498db", backgroundColor: "rgba(52,152,219,0.2)", fill: true, yAxisID:"y2" }
     ]
   },
-  options:{
+  options: {
     responsive:true,
-    scales:{
-      y1:{min:0,max:50,ticks:{stepSize:10}},
-      y2:{position:"right",min:0,max:100,ticks:{stepSize:10}}
+    scales: {
+      y1: { min:0, max:50, ticks:{stepSize:10} },
+      y2: { position:"right", min:0, max:100, ticks:{stepSize:10} }
     }
   }
 });
 
-// ================= GAUGES =================
-function createGauge(id,max,color){
-  return new Chart(document.getElementById(id),{
-    type:"doughnut",
-    data:{datasets:[{data:[0,max],backgroundColor:[color,"#444"]}]},
-    options:{rotation:-90, circumference:180, cutout:"70%", plugins:{legend:{display:false}}}
+// ================= NEEDLE GAUGES =================
+function createNeedleGauge(id, min, max, color){
+  return new Chart(document.getElementById(id), {
+    type: 'gauge',
+    data: { datasets:[{ value: 0, minValue: min, data: [max], backgroundColor: [color] }] },
+    options:{
+      responsive:true,
+      needle: { radiusPercentage: 80, widthPercentage: 3, lengthPercentage: 90, color: 'rgba(255,255,255,0.9)' },
+      valueLabel: { display: true, formatter: v => v.toFixed(1) },
+      plugins: { legend: { display:false } }
+    }
   });
 }
 
-const gTemp = createGauge("gTemp",50,"#e74c3c");
-const gHum  = createGauge("gHum",100,"#3498db");
+const gTemp = createNeedleGauge("gTemp", 0, 50, "#e74c3c");
+const gHum = createNeedleGauge("gHum", 0, 100, "#3498db");
 
 // ================= DATA FLOW =================
-client.on("message",(topic,msg)=>{
+client.on("message", (topic, msg)=>{
   const data = JSON.parse(msg.toString());
   const temp = data.temp;
   const hum = data.hum;
 
   // Update text
-  document.getElementById("temp").innerText = temp;
-  document.getElementById("hum").innerText = hum;
+  document.getElementById("temp").innerText = temp.toFixed(1);
+  document.getElementById("hum").innerText = hum.toFixed(1);
 
-  // Graph
+  // Update graph
   const t = new Date().toLocaleTimeString();
   labels.push(t); tempData.push(temp); humData.push(hum);
   if(labels.length>7){ labels.shift(); tempData.shift(); humData.shift(); }
   chart.update();
 
-  // Gauges
-  gTemp.data.datasets[0].data = [temp,50-temp];
-  gHum.data.datasets[0].data = [hum,100-hum];
+  // Update gauges
+  gTemp.data.datasets[0].value = temp;
+  gHum.data.datasets[0].value = hum;
   gTemp.update();
   gHum.update();
 
-  // Save to Firebase
-  db.ref("node1/latest").set({temp, hum, time: Date.now()});
-  db.ref("node1/history").push({temp, hum, time: new Date().toLocaleString()});
+  // Firebase
+  db.ref("node1/latest").set({ temp, hum, time: Date.now() });
+  db.ref("node1/history").push({ temp, hum, time: new Date().toLocaleString() });
 });
 </script>
 
