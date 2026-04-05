@@ -4,8 +4,13 @@
 <meta charset="UTF-8">
 <title>DHT22 Dashboard</title>
 
+<!-- MQTT -->
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
@@ -16,11 +21,7 @@ h1{margin:10px;font-size:1.5em;}
 .card{background:#2c3246; border-radius:10px; padding:10px; margin:10px auto; max-width:500px;}
 .values{display:flex; justify-content:space-around; margin-bottom:10px;}
 .value span{display:block; font-size:1.4em; font-weight:bold;}
-.gauges{display:flex; justify-content:space-around; margin-top:10px;}
-.gauge-box{width:45%;}
-canvas{width:100% !important;height:160px !important;}
-.needle{position:absolute;width:2px;height:70px;background:white;transform-origin:bottom;top:20px;left:50%;margin-left:-1px;}
-.gauge-wrapper{position:relative;}
+canvas{width:100% !important;height:200px !important;}
 </style>
 </head>
 <body>
@@ -35,17 +36,6 @@ canvas{width:100% !important;height:160px !important;}
   </div>
 
   <canvas id="chart"></canvas>
-
-  <div class="gauges">
-    <div class="gauge-box gauge-wrapper">
-      <canvas id="gTemp"></canvas>
-      <div class="needle" id="nTemp"></div>
-    </div>
-    <div class="gauge-box gauge-wrapper">
-      <canvas id="gHum"></canvas>
-      <div class="needle" id="nHum"></div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -82,26 +72,12 @@ const chart = new Chart(document.getElementById("chart"), {
     {label:"Hum (%)", data:humData, borderColor:"#3498db", backgroundColor:"rgba(52,152,219,0.2)", fill:true, yAxisID:"y2"}
   ]},
   options:{ responsive:true,
-    scales:{ y1:{min:0,max:50,ticks:{stepSize:10}}, y2:{position:"right",min:0,max:100,ticks:{stepSize:10}} }
+    scales:{ 
+      y1:{min:0,max:50,ticks:{stepSize:10}},
+      y2:{position:"right",min:0,max:100,ticks:{stepSize:10}}
+    }
   }
 });
-
-// ================= SIMPLE NEEDLE GAUGES =================
-function createGauge(ctx, max){
-  return new Chart(ctx,{
-    type:"doughnut",
-    data:{datasets:[{data:[0,max], backgroundColor:["#e74c3c","#444"]}]},
-    options:{rotation:-90, circumference:180, cutout:"70%", plugins:{legend:{display:false}}}
-  });
-}
-
-const gTemp = createGauge(document.getElementById("gTemp"),50);
-const gHum  = createGauge(document.getElementById("gHum"),100);
-
-function updateNeedle(needleId,value,max){
-  const angle = (value/max)*180 - 90;
-  document.getElementById(needleId).style.transform = `rotate(${angle}deg)`;
-}
 
 // ================= DATA FLOW =================
 client.on("message",(topic,msg)=>{
@@ -113,24 +89,22 @@ client.on("message",(topic,msg)=>{
   document.getElementById("temp").innerText = temp.toFixed(1);
   document.getElementById("hum").innerText = hum.toFixed(1);
 
-  // Update graph
-  const t = new Date().toLocaleTimeString();
-  labels.push(t); tempData.push(temp); humData.push(hum);
+  // Format time as HH:MM (24-hour)
+  const now = new Date();
+  const hours = now.getHours().toString().padStart(2,'0');
+  const minutes = now.getMinutes().toString().padStart(2,'0');
+  const timeLabel = `${hours}:${minutes}`;
+
+  labels.push(timeLabel);
+  tempData.push(temp);
+  humData.push(hum);
+
   if(labels.length>7){ labels.shift(); tempData.shift(); humData.shift(); }
   chart.update();
 
-  // Update gauges
-  gTemp.data.datasets[0].data=[temp,50-temp];
-  gHum.data.datasets[0].data=[hum,100-hum];
-  gTemp.update();
-  gHum.update();
-
-  updateNeedle("nTemp",temp,50);
-  updateNeedle("nHum",hum,100);
-
   // Firebase
   db.ref("node1/latest").set({ temp, hum, time: Date.now() });
-  db.ref("node1/history").push({ temp, hum, time: new Date().toLocaleString() });
+  db.ref("node1/history").push({ temp, hum, time: now.toLocaleString() });
 });
 </script>
 
