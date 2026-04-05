@@ -82,8 +82,8 @@ const chart = new Chart(document.getElementById("chart"), {
 // ================= DATA FLOW =================
 client.on("message",(topic,msg)=>{
   const data = JSON.parse(msg.toString());
-  const temp = data.temp;
-  const hum  = data.hum;
+  const temp = data.temp || 0;
+  const hum  = data.hum || 0;
 
   // Update text
   document.getElementById("temp").innerText = temp.toFixed(1);
